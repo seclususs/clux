@@ -3,7 +3,6 @@
 use crate::config::runtime;
 use crate::daemon::{bridge, state, traits, types};
 use crate::hal::{properties, sysfs};
-use crate::tweaks::{props, system};
 
 use rustix::event;
 use std::{io, os, sync, thread, time};
@@ -147,47 +146,6 @@ fn is_fatal_runtime_error(e: &types::QosError) -> bool {
         types::QosError::SystemCheckFailed(_) | types::QosError::PermissionDenied(_) => true,
         _ => false,
     }
-}
-
-pub fn apply_prop_tweaks() {
-    log::debug!("Applying Prop tweaks...");
-    let prop_tweaks_list = props::get_prop_tweaks();
-    let mut success_count = 0;
-
-    for tweak in prop_tweaks_list {
-        if properties::property_exists(tweak.key) {
-            if let Err(e) = properties::set_system_property(tweak.key, tweak.value) {
-                log::warn!("Failed to set prop {}: {e}", tweak.key);
-            } else {
-                success_count += 1;
-            }
-        } else {
-            log::debug!("Skipping missing prop: {}", tweak.key);
-        }
-    }
-
-    log::debug!(
-        "Applied {success_count}/{} prop tweaks.",
-        prop_tweaks_list.len()
-    );
-}
-
-pub fn apply_file_tweaks() {
-    log::debug!("Applying File tweaks...");
-    let file_tweaks_list = system::generate_file_tweaks();
-    let mut success_count = 0;
-
-    for tweak in &file_tweaks_list {
-        match sysfs::write_to_file(&tweak.path, tweak.value) {
-            Ok(()) => success_count += 1,
-            Err(e) => log::debug!("Failed to apply tweak {}: {e}", tweak.path),
-        }
-    }
-
-    log::debug!(
-        "Applied {success_count}/{} file tweaks.",
-        file_tweaks_list.len()
-    );
 }
 
 pub fn wait_for_boot_completion(tag: &str) {
