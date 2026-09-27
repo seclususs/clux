@@ -13,7 +13,6 @@ DEFAULT_ANDROID_API = "33"
 DEFAULT_BUILD_TYPE = "Release"
 ARCH_ABI = "arm64-v8a"
 RUST_TARGET = "aarch64-linux-android"
-KEY_ALIAS = "qos_release"
 
 
 class Style:
@@ -113,10 +112,8 @@ def clean_workspace(root_dir):
     targets = [
         root_dir / "build",
         root_dir / "target",
-        root_dir / "app/app/build",
         root_dir / "scripts/output",
         root_dir / "magisk-module/system/bin/qos_daemon",
-        root_dir / "magisk-module/common/apk/com/seclususs/qos/com.seclususs.qos.apk",
     ]
 
     for path in targets:
@@ -237,55 +234,6 @@ def build_daemon(ndk_path, api_level, build_type, root_dir):
     return binary
 
 
-def build_apk(build_type, root_dir, keystore_path, password_file):
-    log_info(f"Building APK [{build_type}]")
-
-    app_dir = root_dir / "app"
-
-    gradle_exe = "gradlew.bat" if platform.system() == "Windows" else "gradlew"
-
-    gradle_cmd = [str(app_dir / gradle_exe)]
-
-    task = f"assemble{build_type}"
-    gradle_cmd.append(task)
-
-    if build_type == "Release":
-        if not keystore_path.exists():
-            log_err(f"Keystore not found at {keystore_path}")
-
-        if not password_file.exists():
-            log_err(f"Password file not found at {password_file}")
-
-        try:
-            password = password_file.read_text().strip()
-
-        except OSError as exc:
-            log_err(f"Failed to read password file: {exc}")
-
-        gradle_cmd.extend(
-            [
-                f"-Pandroid.injected.signing.store.file={keystore_path.resolve()}",
-                f"-Pandroid.injected.signing.store.password={password}",
-                f"-Pandroid.injected.signing.key.alias={KEY_ALIAS}",
-                f"-Pandroid.injected.signing.key.password={password}",
-            ]
-        )
-
-    log_sub("Running Gradle...")
-    run_cmd(gradle_cmd, cwd=app_dir)
-
-    apk_dir = app_dir / "app" / "build" / "outputs" / "apk" / build_type.lower()
-
-    apk_file = apk_dir / f"app-{build_type.lower()}.apk"
-
-    if not apk_file.exists():
-        log_err("APK build failed: apk not found.")
-
-    log_ok("APK build successful")
-
-    return apk_file
-
-
 def extract_version(root_dir):
     prop_file = root_dir / "magisk-module" / "module.prop"
 
@@ -302,31 +250,17 @@ def extract_version(root_dir):
     return match.group(1).strip()
 
 
-def package_module(root_dir, daemon_bin, apk_bin, version):
+def package_module(root_dir, daemon_bin, version):
     log_info("Packaging Magisk Module...")
 
     magisk_dir = root_dir / "magisk-module"
 
     daemon_dest = magisk_dir / "system" / "bin" / "qos_daemon"
 
-    apk_dest = (
-        magisk_dir
-        / "common"
-        / "apk"
-        / "com"
-        / "seclususs"
-        / "qos"
-        / "com.seclususs.qos.apk"
-    )
-
     daemon_dest.parent.mkdir(parents=True, exist_ok=True)
-    apk_dest.parent.mkdir(parents=True, exist_ok=True)
 
     shutil.copy2(daemon_bin, daemon_dest)
     log_sub(f"Placed Daemon at {daemon_dest.relative_to(root_dir)}")
-
-    shutil.copy2(apk_bin, apk_dest)
-    log_sub(f"Placed APK at {apk_dest.relative_to(root_dir)}")
 
     output_dir = root_dir / "scripts" / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -368,7 +302,7 @@ def main():
 
     parser.add_argument(
         "--target",
-        choices=["daemon", "apk", "module", "all", "none"],
+        choices=["daemon", "module", "all", "none"],
         default="all",
         help="Build target",
     )
@@ -402,18 +336,6 @@ def main():
         "--skip-lint",
         action="store_true",
         help="Skip linter",
-    )
-
-    parser.add_argument(
-        "--keystore",
-        default="scripts/keystore/qos.keystore",
-        help="Path to keystore relative to root",
-    )
-
-    parser.add_argument(
-        "--password-file",
-        default="scripts/keystore/keystore.properties",
-        help="Path to password file relative to root",
     )
 
     args = parser.parse_args()
@@ -463,24 +385,11 @@ def main():
                 root_dir,
             )
 
-        apk_bin = None
-
-        if args.target in ["apk", "module", "all"]:
-            keystore_path = root_dir / args.keystore
-            password_file = root_dir / args.password_file
-
-            apk_bin = build_apk(
-                args.type,
-                root_dir,
-                keystore_path,
-                password_file,
-            )
-
         if args.target in ["module", "all"]:
-            if not daemon_bin or not apk_bin:
+            if not daemon_bin:
                 log_err(
                     "Cannot package module: "
-                    "Missing Daemon or APK artifact."
+                    "Missing Daemon artifact."
                 )
 
             version = extract_version(root_dir)
@@ -488,7 +397,6 @@ def main():
             package_module(
                 root_dir,
                 daemon_bin,
-                apk_bin,
                 version,
             )
 
