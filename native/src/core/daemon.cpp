@@ -1,5 +1,4 @@
 #include "daemon/daemon.hpp"
-#include "daemon/config.hpp"
 #include "daemon/crash.hpp"
 #include "daemon/detector.hpp"
 #include "daemon/logger.hpp"
@@ -60,43 +59,9 @@ namespace qos::core
 
         LOGD("Checking Hardware Support...");
         const auto features = qos::system::Detector::check_features();
-
-        LOGD("Loading Configuration...");
-        const auto cfg = config::Loader::load_from_file("/data/adb/modules/sys_qos/config.ini");
-
-        const bool run_cpu = cfg.cpu && features.has_cpu_psi;
-
-        const bool run_io = cfg.io && features.has_io_psi;
-
-        const bool run_cleaner =
-            cfg.cleaner && features.cleaner_supported && features.has_cpu_psi && features.has_io_psi;
-
-        const bool run_tweaks = cfg.tweaks;
-
-        const bool run_blocker = cfg.blocker;
-
-        if (!run_cpu && !run_io && !run_cleaner && !run_tweaks && !run_blocker)
-        {
-            LOGE("Shutting down (No services enabled).");
-            return EXIT_FAILURE;
-        }
+        (void)features; // Avoid unused variable warning
 
         LOGD("Activating Services...");
-        ::set_cpu_service(run_cpu);
-        ::set_storage_service(run_io);
-        ::set_cleaner_service(run_cleaner);
-        ::set_tweaks(run_tweaks);
-        ::set_blocker_service(run_blocker);
-
-        if (cfg.has_cpu_limits)
-        {
-            ::set_cpu_limits(&cfg.cpu_limits);
-        }
-
-        if (cfg.has_storage_limits)
-        {
-            ::set_storage_limits(&cfg.storage_limits);
-        }
 
         ::mallopt(M_PURGE, 0);
         qos::system::Tuner::lock_memory();

@@ -47,10 +47,7 @@ impl StorageController {
     pub fn new() -> types::Result<Self> {
         log::debug!("Initializing Storage Controller...");
 
-        let config_limits = state::STORAGE_LIMITS_OVERRIDE
-            .get()
-            .copied()
-            .unwrap_or_else(|| limits::GlobalConfig::default().storage_config);
+        let config_limits = limits::StorageLimitsConfig::default();
 
         let storage_math_config = storage::StorageMathConfig::default();
         let controller_config = ControllerConfig::default();
