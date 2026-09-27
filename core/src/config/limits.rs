@@ -54,8 +54,3 @@ impl Default for StorageLimitsConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct GlobalConfig {
-    pub cpu_config: CpuLimitsConfig,
-    pub storage_config: StorageLimitsConfig,
-}
