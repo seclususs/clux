@@ -5,8 +5,6 @@
 [![Rust](https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white)](https://github.com/rust-lang)
 [![C++](https://img.shields.io/badge/C++-00599C?style=flat-square&logo=c%2B%2B&logoColor=white)](https://github.com/isocpp)
 [![CMake](https://img.shields.io/badge/CMake-064F8C?style=flat-square&logo=cmake&logoColor=white)](https://github.com/Kitware/CMake)
-[![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://github.com/Kotlin)
-[![Jetpack Compose](https://img.shields.io/badge/Compose-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white)](https://github.com/androidx/androidx)
 [![Android](https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/aosp-mirror)
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/torvalds/linux)
 [![Magisk](https://img.shields.io/badge/Magisk-00AF9C.svg?style=flat-square&logo=magisk&logoColor=white)](https://github.com/topjohnwu/Magisk)
@@ -28,7 +26,6 @@ QoS is a low-overhead, daemon engineered to enforce Quality of Service across An
 
 2. **Asynchronous Event Engine in `/core`:** Written in Rust. Executes a highly efficient, non-blocking `epoll` multiplexer to dynamically manage CPU scheduling parameters, block I/O queues, and subsystem background services via direct `sysfs` mutations and PSI interrupts.
 
-3. **Management Client in `/app`:** Written in Kotlin using Jetpack Compose with Clean Architecture (MVVM). It interfaces with the QoS daemon via privileged root shell execution to provide live status monitoring, persistent module management, and advanced tuning for kernel scheduler and storage I/O parameters.
 
 ### System Architecture
 
@@ -73,16 +70,16 @@ subgraph NATIVE["RUNTIME"]
     N_CRASH["Crash & Signal Handler"]
     N_TUNER["OOM & Hardener"]
     N_DETECT["Kernel Feature Detector"]
-    N_CONF["Config Parser"]
+    
     N_BRIDGE["FFI Bridge"]
 
     N_MAIN --> N_CRASH
     N_MAIN --> N_TUNER
     N_MAIN --> N_DETECT
-    N_MAIN --> N_CONF
+    
     
     N_DETECT --> N_BRIDGE
-    N_CONF --> N_BRIDGE
+    
 end
 
 subgraph CORE["CORE ENGINE"]
@@ -98,10 +95,10 @@ subgraph CORE["CORE ENGINE"]
         W_TWEAK["System Tweaker Thread<br/>(One-time execution)"]
     end
 
-    R_ENTRY -.-> W_TWEAK
+    
     R_ENTRY ==> EPOLL
-    W_TWEAK -->|Hardware Probing| K_SYS
-    W_TWEAK -->|Apply Tunables| H_PROP
+    
+    
 
     subgraph MAIN["MAIN EVENT LOOP"]
         style MAIN fill:#252526,stroke:#ffffff,color:#ffffff
@@ -193,7 +190,7 @@ W_BLK --> A_PM
 
 * **Dynamic CPU Governor:** Modulates core scheduling tunables including `latency_ns`, `min_granularity_ns`, `wakeup_granularity_ns`, `migration_cost_ns`, `walt_init_task_load_pct`, and `uclamp_util_min`. Calculations are driven by `/proc/pressure/cpu` trends, utilizing pressure velocity, integral tracking, and thermal scaling derived from native battery and CPU temperature sensors.
 
-* **Storage I/O Tuning:** Features a dual-layer optimization engine. Statically, it detects storage types such as NVMe, UFS, eMMC, and Rotational to assign optimal I/O schedulers like `kyber`, `mq-deadline`, and `bfq`, forcing strict parameters like `add_random=0`, `iostats=1`, and `rq_affinity=1` alongside scheduler-specific tweaks. Examples include `fifo_batch=16`, `writes_starved=2`, and `front_merges=1` for deadline, and `slice_idle=0` for bfq. Dynamically, a PID loop monitors `/proc/pressure/io` and `diskstats` to continuously recalculate and scale block device `read_ahead` and `nr_requests` based on real-time throughput, latency, and sequentiality metrics.
+* **Storage I/O Tuning:** A PID loop monitors `/proc/pressure/io` and `diskstats` to continuously recalculate and scale block device `read_ahead` and `nr_requests` based on real-time throughput, latency, and sequentiality metrics.
 
 * **Autonomous Cleaner Service:** Executes asynchronous background maintenance on system dumps located at `/data/anr` and `/data/tombstones`, as well as application caches located at `/data/data` and `/sdcard/Android/data`. Once a cleanup cycle completes, it triggers a native `mallopt` syscall passing `MALLOPT_TRIM` and `0` to aggressively release unused heap memory back to the system.
 
@@ -203,9 +200,7 @@ W_BLK --> A_PM
 
 ## Configuration and Flexibility
 
-* **Static Foundations:** To ensure maximum stability and zero-parsing overhead during the critical execution path, baseline system optimizations are strictly hardcoded into the compiled binary. This specifically encompasses extensive system and property tweaks including VM behavior, TCP/IPv4 network rules, kernel log suppressions, and Dalvik flags, as well as foundational storage and scheduler configurations such as I/O scheduler priority arrays for NVMe/UFS/eMMC/Rotational drives and hardcoded queue flags.
-
-* **Dynamic Tuning:** Initialization parameters including CPU governor bounds, dynamic I/O limits, and subsystem toggles are modular. These can be customized via the `config.ini` initialization file or through the Companion App interface. Any changes to these parameters require a device reboot to take effect.
+* **Static Foundations:** To ensure maximum stability and zero-parsing overhead during the critical execution path, all system optimizations and controller bounds are strictly hardcoded into the compiled binary. The daemon operates entirely headless with optimized defaults out of the box.
 
 ---
 
@@ -227,8 +222,6 @@ W_BLK --> A_PM
 2. Flash the archive through the Magisk Manager application.
 3. Reboot the device to initialize the daemon.
 
-> **Companion App:** The QoS GUI manager APK is bundled within the module package. During the flashing process, you will be prompted to choose whether or not to install the companion app. The core daemon runs perfectly headless and does not strictly require the client app to function.
->
 > **Diagnostics:** Execution logs are routed directly to the native Android logging system. They can be audited through terminal Logcat by filtering the `QoS` tag using commands like `logcat -s QoS`. In release daemon builds, only error logs are emitted, while all other execution logs are suppressed.
 
 ---
@@ -240,3 +233,6 @@ Copyright (C) 2025 seclususs
 This project is licensed under the **GNU General Public License v3.0**, also known as **GPL-3.0**.<br>
 This program comes with **NO WARRANTY**, to the extent permitted by law.<br>
 See [LICENSE](LICENSE) for details.
+
+
+
