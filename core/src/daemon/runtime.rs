@@ -2,7 +2,7 @@
 
 use crate::config::runtime;
 use crate::daemon::{bridge, state, traits, types};
-use crate::hal::{properties, sysfs};
+use crate::hal::properties;
 
 use rustix::event;
 use std::{io, os, sync, thread, time};

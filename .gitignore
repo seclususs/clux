@@ -12,11 +12,7 @@ output-metadata.json
 # Local configuration
 local.properties
 
-# Keystore & Google Services
-*.jks
-*.keystore
-keystore.properties
-google-services.json
+
 
 # IDE
 .vscode/

@@ -17,12 +17,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: "17"
-          distribution: "temurin"
-
       - name: Setup Android NDK
         run: echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
 
@@ -39,53 +33,16 @@ jobs:
       - name: Install System Dependencies
         run: sudo apt-get update && sudo apt-get install -y ninja-build cmake
 
-      - name: Prepare Keystore from Secrets
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        run: |
-          mkdir -p scripts/keystore
-          echo "$KEYSTORE_BASE64" | base64 --decode > scripts/keystore/qos.keystore
-          echo "$KEYSTORE_PASSWORD" > scripts/keystore/keystore.properties
-
       - name: Make Script Executable
-        run: |
-          chmod +x scripts/build.py
-          chmod +x app/gradlew
+        run: chmod +x scripts/build.py
 
-      - name: Filter Changed Paths
+      - name: Compile Daemon
         if: github.ref_type != 'tag'
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            daemon:
-              - 'core/**'
-              - 'native/**'
-              - 'Cargo.toml'
-            apk:
-              - 'app/**'
-              - '*.gradle.kts'
-              - 'gradle.properties'
-              - 'settings.gradle.kts'
-
-      - name: Compile Daemon Only
-        if: github.ref_type != 'tag' && steps.filter.outputs.daemon == 'true' && steps.filter.outputs.apk == 'false'
         run: python scripts/build.py --target daemon --type Release
-
-      - name: Compile APK Only
-        if: github.ref_type != 'tag' && steps.filter.outputs.apk == 'true' && steps.filter.outputs.daemon == 'false'
-        run: python scripts/build.py --target apk --type Release --skip-check --skip-lint
-
-      - name: Compile Both Daemon and APK
-        if: github.ref_type != 'tag' && steps.filter.outputs.daemon == 'true' && steps.filter.outputs.apk == 'true'
-        run: |
-          python scripts/build.py --target daemon --type Release
-          python scripts/build.py --target apk --type Release --skip-clean --skip-check --skip-lint
 
       - name: Full Build and Package Module
         if: github.ref_type == 'tag'
-        run: python scripts/build.py --target all --type Release
+        run: python scripts/build.py --target module --type Release
 
       - name: Upload Magisk Module Artifact
         if: github.ref_type == 'tag'
