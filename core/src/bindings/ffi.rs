@@ -1,6 +1,6 @@
 //! Author: [Seclususs](https://github.com/seclususs)
 
-use crate::controllers::{blocker, cleaner, cpu, signal, storage};
+use crate::controllers::{cpu, signal, storage};
 use crate::daemon::{bridge, logging, runtime, state, types};
 
 use std::{os, sync, thread, time};
@@ -72,14 +72,6 @@ pub unsafe extern "C" fn start_services(signal_fd: i32) -> i32 {
 
                 services.push(runtime::RecoverableService::new("CPU", || {
                     Ok(Box::new(cpu::CpuController::new()?))
-                }));
-
-                services.push(runtime::RecoverableService::new("Cleaner", || {
-                    Ok(Box::new(cleaner::CleanerController::new()?))
-                }));
-
-                services.push(runtime::RecoverableService::new("Blocker", || {
-                    Ok(Box::new(blocker::BlockerController::new()?))
                 }));
 
                 let svc_len = services.len();

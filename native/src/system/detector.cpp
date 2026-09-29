@@ -14,35 +14,11 @@ namespace qos::system
             return ::access(path, mode) == 0;
         }
 
-        [[nodiscard]] bool check_cleaner_env() noexcept
-        {
-            if (!can_access("/data/data", R_OK | X_OK))
-                return false;
-
-            if (!can_access("/proc", R_OK | X_OK))
-                return false;
-
-            struct statvfs vfs{};
-
-            return ::statvfs("/data", &vfs) == 0;
-        }
-
     } // namespace
 
     KernelFeatures Detector::check_features() noexcept
     {
         KernelFeatures features;
-
-        features.cleaner_supported = check_cleaner_env();
-
-        if (features.cleaner_supported)
-        {
-            LOGD("Cleaner prerequisites met.");
-        }
-        else
-        {
-            LOGW("Cleaner disabled.");
-        }
 
         if (!can_access("/proc/pressure", R_OK | X_OK))
         {

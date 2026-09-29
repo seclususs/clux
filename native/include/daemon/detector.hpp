@@ -16,7 +16,6 @@ namespace qos::system
     {
         bool has_cpu_psi{false};       ///< Indicates CPU Pressure Stall Information support.
         bool has_io_psi{false};        ///< Indicates I/O Pressure Stall Information support.
-        bool cleaner_supported{false}; ///< Indicates environment support for cleanup utilities.
     };
 
     /**

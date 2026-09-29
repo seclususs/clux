@@ -4,4 +4,3 @@ pub mod monitors;
 pub mod properties;
 pub mod sensors;
 pub mod sysfs;
-pub mod traversal;
