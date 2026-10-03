@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-add_library(clux STATIC base.cpp node.cpp)
+add_library(clux STATIC base.cpp event.cpp node.cpp)
 
 target_include_directories(clux PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
