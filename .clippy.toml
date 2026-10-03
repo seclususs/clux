@@ -1,0 +1,10 @@
+cognitive-complexity-threshold = 15
+too-many-lines-threshold = 80
+too-many-arguments-threshold = 5
+type-complexity-threshold = 150
+enum-variant-size-threshold = 64
+trivial-copy-size-limit = 16
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-panic-in-tests = true
