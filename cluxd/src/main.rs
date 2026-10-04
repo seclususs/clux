@@ -7,6 +7,7 @@
 
 #[allow(unsafe_code)]
 mod abi;
+mod log;
 
 #[cfg(not(test))]
 #[panic_handler]
