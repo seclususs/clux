@@ -9,6 +9,7 @@
 mod abi;
 mod automata;
 mod log;
+mod sysfs;
 
 #[cfg(not(test))]
 #[panic_handler]
