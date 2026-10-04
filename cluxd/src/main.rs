@@ -7,6 +7,7 @@
 
 #[allow(unsafe_code)]
 mod abi;
+mod automata;
 mod log;
 
 #[cfg(not(test))]
