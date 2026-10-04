@@ -9,6 +9,7 @@
 mod abi;
 mod automata;
 mod log;
+mod psi;
 mod sysfs;
 
 #[cfg(not(test))]
