@@ -4,3 +4,4 @@
 mod knob;
 mod lexer;
 mod path;
+mod probe;
