@@ -1,10 +1,16 @@
 [workspace]
-members = ["core"]
-resolver = "3"
+members = ["cluxd"]
+resolver = "2"
+
+[profile.dev]
+panic = "abort"
+opt-level = 1
 
 [profile.release]
-lto = true
-codegen-units = 1
-strip = true
-panic = "abort"
 opt-level = 2
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+debug = false
+incremental = false
