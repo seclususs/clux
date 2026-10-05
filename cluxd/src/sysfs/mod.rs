@@ -1,7 +1,7 @@
 // Copyright 2026 seclususs
 // SPDX-License-Identifier: GPL-3.0-only
 
-mod knob;
+pub mod knob;
 pub mod lexer;
 mod path;
-mod probe;
+pub mod probe;

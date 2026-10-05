@@ -12,6 +12,7 @@ mod event;
 mod log;
 mod power;
 mod psi;
+mod sched;
 mod sysfs;
 
 #[cfg(not(test))]
