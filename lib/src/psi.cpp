@@ -37,7 +37,8 @@ CLUX_API int32_t clux_psi_arm(const char *path, uint32_t threshold_us, uint32_t 
         return -EOVERFLOW;
     }
 
-    clux::Fd fd(clux::retry([&] { return ::open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC); }));
+    const int flags = O_RDWR | O_NONBLOCK | O_CLOEXEC;
+    clux::Fd fd(clux::retry([&] { return ::open(path, flags); }));
     if (!fd.valid()) {
         return clux::fail();
     }

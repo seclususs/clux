@@ -108,12 +108,12 @@ int32_t put(const char *path, const char *text) noexcept
 CLUX_API int32_t clux_node_open(const char *path, uint32_t mode)
 {
     const int access = clux::node::access_flags(mode);
-
     if (path == nullptr || access < 0) {
         return -EINVAL;
     }
 
-    clux::Fd fd(clux::retry([&] { return ::open(path, access | O_CLOEXEC | O_NOFOLLOW); }));
+    const int flags = access | O_CLOEXEC | O_NOFOLLOW;
+    clux::Fd fd(clux::retry([&] { return ::open(path, flags); }));
     if (!fd.valid()) {
         return clux::fail();
     }
@@ -170,7 +170,8 @@ CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap)
         return -EINVAL;
     }
 
-    const clux::Fd fd(clux::retry([&] { return ::open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC); }));
+    const int flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC;
+    const clux::Fd fd(clux::retry([&] { return ::open(dir, flags); }));
     if (!fd.valid()) {
         return clux::fail();
     }
