@@ -8,6 +8,7 @@
 #[allow(unsafe_code)]
 mod abi;
 mod automata;
+mod block;
 mod event;
 mod log;
 mod power;
