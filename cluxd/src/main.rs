@@ -9,6 +9,7 @@
 mod abi;
 mod automata;
 mod log;
+mod power;
 mod psi;
 mod sysfs;
 

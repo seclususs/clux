@@ -4,5 +4,5 @@
 mod cadence;
 pub mod envelope;
 pub mod fixed;
-mod ladder;
+pub mod ladder;
 mod markov;
