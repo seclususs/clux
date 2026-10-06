@@ -1,65 +1,10 @@
-# Android Studio / Gradle
-.gradle/
-*/build/
-app/build/
-captures/
-.externalNativeBuild/
-.cxx/
-*.apk
-*.aab
-output-metadata.json
-
-# Local configuration
-local.properties
-
-# Keystore & Google Services
-*.jks
-*.keystore
-keystore.properties
-google-services.json
-
-# IDE
-.vscode/
-.idea/
-*.iml
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
-
-# Rust
-target/
-Cargo.lock
-**/*.rs.bk
-
-# C / C++ / CMake
-build/
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-*.o
-*.obj
-*.out
-*.exe
-*.app
-compile_commands.json
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Magisk
-magisk-module/system/
+/build/
 *.zip
-
-# Logs & OS Files
 *.log
-*.hprof
+.idea/
+.vscode/
 .DS_Store
-Thumbs.db
-
-# Editor temporary files
-*.swp
-*~
-*.bak
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+CMakeUserPresets.json

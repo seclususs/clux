@@ -1,0 +1,93 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install LLVM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-tidy
+
+      - name: Select NDK
+        run: echo "ANDROID_NDK_HOME=${ANDROID_NDK_LATEST_HOME}" >> "${GITHUB_ENV}"
+
+      - name: Syntax and clang-tidy
+        working-directory: lib
+        run: |
+          cmake --preset lint
+          cmake --build --preset lint
+
+  daemon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install
+
+      - name: Syntax
+        run: |
+          cargo check --locked --bins
+          cargo check --locked --all-targets --target x86_64-unknown-linux-gnu
+
+      - name: Clippy
+        run: |
+          cargo clippy --locked --bins -- -D warnings
+          cargo clippy --locked --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install shell tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck shfmt
+
+      - name: Syntax
+        run: |
+          for script in modules/*.sh modules/common/*.sh; do
+            sh -n "${script}"
+          done
+
+      - name: ShellCheck
+        run: shellcheck modules/*.sh modules/common/*.sh
+
+      - name: Format
+        run: shfmt -d modules/*.sh modules/common/*.sh
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: pip install ruff mypy
+
+      - name: Ruff
+        run: |
+          ruff check tools
+          ruff format --check tools
+
+      - name: Mypy
+        run: mypy --config-file tools/pyproject.toml tools/build.py

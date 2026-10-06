@@ -1,0 +1,23 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["CPY001", "D", "COM812", "ISC001", "INP001", "S603"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+warn_unused_ignores = true
+disallow_any_explicit = true
+disallow_any_unimported = true
+extra_checks = true
+enable_error_code = ["ignore-without-code", "redundant-self", "truthy-bool", "possibly-undefined"]

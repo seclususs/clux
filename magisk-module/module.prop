@@ -1,7 +1,0 @@
-id=sys_qos
-name=QoS
-version=2.8
-versionCode=19
-author=seclususs
-description=Native daemon for system optimization.
-updateJson=https://raw.githubusercontent.com/seclususs/qos-android/main/magisk-module/update.json

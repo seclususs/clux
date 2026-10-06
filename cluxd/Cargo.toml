@@ -1,0 +1,53 @@
+[package]
+name = "cluxd"
+version = "3.0.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Kernel tuning daemon for Android"
+license = "GPL-3.0-only"
+repository = "https://github.com/seclususs/clux"
+publish = false
+build = "build.rs"
+
+[[bin]]
+name = "cluxd"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unused_results = "deny"
+missing_debug_implementations = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unused_qualifications = "deny"
+single_use_lifetimes = "deny"
+let_underscore_drop = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"
+as_conversions = "deny"
+float_arithmetic = "deny"
+std_instead_of_core = "deny"
+std_instead_of_alloc = "deny"
+alloc_instead_of_core = "deny"
+mem_forget = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+exit = "deny"
+string_slice = "deny"
+multiple_unsafe_ops_per_block = "deny"
+missing_assert_message = "deny"

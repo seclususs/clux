@@ -1,0 +1,7 @@
+id=cluxd
+name=cluxd
+version=3.0
+versionCode=20
+author=seclususs
+description=Kernel tuning daemon for Android.
+updateJson=https://raw.githubusercontent.com/seclususs/clux/main/modules/update.json

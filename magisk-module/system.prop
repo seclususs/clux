@@ -1,9 +1,0 @@
-ro.vendor.mtk.bt_sap_enable=false
-ro.vendor.mtk_wappush_support=0
-ro.vendor.mtk_c2k_support=0
-ro.vendor.mtk_c2k_lte_mode=0
-ro.vendor.mtk_embms_support=0
-ro.vendor.mtk_md_world_mode_support=0
-ro.vendor.connsys.dedicated.log=0
-ro.vendor.mtk_protocol1_rat_config=Lf/Lt/W/G
-ro.vendor.mtk_wapi_support=0
