@@ -9,6 +9,7 @@
 mod abi;
 mod automata;
 mod block;
+mod boot;
 mod event;
 mod log;
 mod power;
@@ -18,13 +19,13 @@ mod sysfs;
 
 #[cfg(not(test))]
 #[panic_handler]
-const fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    abi::abort()
 }
 
 #[cfg(not(test))]
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-const extern "C" fn main() -> core::ffi::c_int {
-    0
+pub extern "C" fn main() -> core::ffi::c_int {
+    boot::run()
 }
