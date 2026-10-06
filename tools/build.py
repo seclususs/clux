@@ -1,420 +1,207 @@
-#!/usr/bin/env python3
 import argparse
 import os
-import platform
-import re
 import shutil
 import subprocess
 import sys
-import time
+import zipfile
+from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import ClassVar, Final, NoReturn, override
 
-DEFAULT_ANDROID_API = "33"
-DEFAULT_BUILD_TYPE = "Release"
-ARCH_ABI = "arm64-v8a"
-RUST_TARGET = "aarch64-linux-android"
+ROOT: Final = Path(__file__).resolve().parent.parent
+BUILD: Final = ROOT / "build"
+DIST: Final = BUILD / "dist"
+STAGE: Final = BUILD / "stage"
+LIB_SOURCE: Final = ROOT / "lib"
+LIB_OUTPUT: Final = BUILD / "lib" / "release"
+CARGO_OUTPUT: Final = BUILD / "cargo"
+MODULE_SOURCE: Final = ROOT / "modules"
 
+PRESET: Final = "release"
+TARGET: Final = "aarch64-linux-android"
+LINKER_VARIABLE: Final = "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER"
+API_LEVEL: Final = 29
+DAEMON: Final = "cluxd"
+MODULE_EXCLUDED: Final = ("update.json",)
+EXECUTABLE_NAMES: Final = frozenset({"update-binary", DAEMON})
+EXECUTABLE_SUFFIXES: Final = frozenset({".sh"})
+ZIP_EPOCH: Final = (1980, 1, 1, 0, 0, 0)
+ZIP_LEVEL: Final = 9
+MODE_EXECUTABLE: Final = 0o755
+MODE_REGULAR: Final = 0o644
+MODE_SHIFT: Final = 16
 
-class Style:
-    GREEN = "\033[92m"
-    CYAN = "\033[96m"
-    YELLOW = "\033[93m"
-    RED = "\033[91m"
-    BOLD = "\033[1m"
-    RESET = "\033[0m"
+type Environment = Mapping[str, str]
 
 
-def log_info(msg):
-    print(f"{Style.BOLD}[+]{Style.RESET} {msg}")
+def say(message: str) -> None:
+    sys.stdout.write(f"{message}\n")
 
 
-def log_sub(msg):
-    print(f" {Style.CYAN}->{Style.RESET} {msg}")
+def fail(message: str) -> NoReturn:
+    text = f"error: {message}"
+    raise SystemExit(text)
 
 
-def log_ok(msg):
-    print(f" {Style.GREEN}[OK]{Style.RESET} {msg}")
+def locate(tool: str) -> str:
+    found = shutil.which(tool)
+    if found is None:
+        fail(f"required tool is not in PATH: {tool}")
 
+    return found
 
-def log_warn(msg):
-    print(f"{Style.YELLOW}[WARN]{Style.RESET} {msg}")
 
+def execute(command: Sequence[str], cwd: Path, env: Environment | None = None) -> None:
+    say(f"$ {' '.join(command)}")
+    subprocess.run(command, cwd=cwd, env=env, check=True)
 
-def log_err(msg):
-    print(f"\n{Style.RED}[ERROR]{Style.RESET} {msg}")
-    sys.exit(1)
 
+def ndk_root() -> Path:
+    value = os.environ.get("ANDROID_NDK_HOME")
+    if not value:
+        fail("ANDROID_NDK_HOME is not set")
 
-def find_ndk():
-    ndk_env = os.environ.get("ANDROID_NDK_HOME")
+    root = Path(value)
+    if not root.is_dir():
+        fail(f"ANDROID_NDK_HOME does not point to a directory: {root}")
 
-    if ndk_env and os.path.exists(ndk_env):
-        return Path(ndk_env)
+    return root
 
-    home = Path.home()
 
-    if platform.system() == "Windows":
-        search_paths = [
-            Path(os.environ.get("LOCALAPPDATA", "")) / "Android/Sdk/ndk",
-            home / "AppData/Local/Android/Sdk/ndk",
-        ]
+def ndk_linker(ndk: Path) -> Path:
+    prebuilt = ndk / "toolchains" / "llvm" / "prebuilt"
 
-    elif platform.system() == "Darwin":
-        search_paths = [home / "Library/Android/sdk/ndk"]
+    hosts = sorted(entry for entry in prebuilt.glob("*") if entry.is_dir())
+    if not hosts:
+        fail(f"no LLVM toolchain found under {prebuilt}")
 
-    else:
-        search_paths = [home / "Android/Sdk/ndk"]
+    executable_name = f"{TARGET}{API_LEVEL}-clang"
+    if os.name == "nt":
+        executable_name += ".cmd"
 
-    for path in search_paths:
-        if path.exists():
-            versions = sorted(
-                [d for d in path.iterdir() if d.is_dir()],
-                reverse=True,
-            )
+    linker = hosts[0] / "bin" / executable_name
+    if not linker.is_file():
+        fail(f"linker not found: {linker}")
 
-            if versions:
-                return versions[0]
+    return linker
 
-    return None
 
+def daemon_binary() -> Path:
+    return CARGO_OUTPUT / TARGET / "release" / DAEMON
 
-def check_tool(tool_name):
-    if not shutil.which(tool_name):
-        log_err(f"Missing tool: '{tool_name}'. Please install it.")
 
+def module_version() -> str:
+    properties = (MODULE_SOURCE / "module.prop").read_text(encoding="utf-8")
+    for line in properties.splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key == "version":
+            return value.strip()
 
-def run_cmd(cmd, cwd=None, silent=False):
-    try:
-        if silent:
-            process = subprocess.run(
-                cmd,
-                cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
+    return fail("version is missing in modules/module.prop")
 
-            if process.returncode != 0:
-                print(process.stdout)
-                raise subprocess.CalledProcessError(process.returncode, cmd)
 
-        else:
-            subprocess.run(cmd, check=True, cwd=cwd)
+def is_executable(path: Path) -> bool:
+    return path.name in EXECUTABLE_NAMES or path.suffix in EXECUTABLE_SUFFIXES
 
-    except subprocess.CalledProcessError as exc:
-        log_err(f"Command failed: {' '.join([str(c) for c in cmd])}")
-        raise exc
 
+def archive(source: Path, target: Path) -> None:
+    files = sorted(entry for entry in source.rglob("*") if entry.is_file())
 
-def clean_workspace(root_dir):
-    targets = [
-        root_dir / "build",
-        root_dir / "target",
-        root_dir / "scripts/output",
-        root_dir / "magisk-module/system/bin/qos_daemon",
-    ]
-
-    for path in targets:
-        if path.exists():
-            try:
-                if path.is_dir():
-                    shutil.rmtree(path)
-
-                else:
-                    path.unlink()
-
-                log_sub(f"Removed: {path.relative_to(root_dir)}")
-
-            except OSError as exc:
-                log_warn(f"Failed to clean {path}: {exc}")
-
-
-def run_quality_checks(ndk_path, api_level, root_dir, do_check, do_lint):
-    if not do_check and not do_lint:
-        return
+    with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=ZIP_LEVEL) as bundle:
+        for path in files:
+            info = zipfile.ZipInfo(path.relative_to(source).as_posix(), ZIP_EPOCH)
+            mode = MODE_EXECUTABLE if is_executable(path) else MODE_REGULAR
+            info.external_attr = mode << MODE_SHIFT
+            info.compress_type = zipfile.ZIP_DEFLATED
+            bundle.writestr(info, path.read_bytes(), compresslevel=ZIP_LEVEL)
 
-    log_info("Running quality checks...")
-    rust_path = root_dir / "core"
 
-    if rust_path.exists():
-        if do_check:
-            run_cmd(
-                ["cargo", "check", "--target", RUST_TARGET, "--release"],
-                cwd=rust_path,
-                silent=True,
-            )
-            log_ok("Rust syntax")
+class Command(ABC):
+    name: ClassVar[str]
+    summary: ClassVar[str]
 
-        if do_lint:
-            run_cmd(
-                ["cargo", "clippy", "--target", RUST_TARGET, "--release"],
-                cwd=rust_path,
-                silent=True,
-            )
-            log_ok("Rust lint")
+    @abstractmethod
+    def run(self) -> None: ...
 
-    build_dir = root_dir / "build" / "Release" / ARCH_ABI
-    build_dir.mkdir(parents=True, exist_ok=True)
 
-    toolchain = ndk_path / "build/cmake/android.toolchain.cmake"
+class Clean(Command):
+    name = "clean"
+    summary = "remove the build directory"
 
-    cmake_cmd = [
-        "cmake",
-        "-Wno-dev",
-        f"-DANDROID_ABI={ARCH_ABI}",
-        f"-DANDROID_PLATFORM=android-{api_level}",
-        f"-DCMAKE_TOOLCHAIN_FILE={toolchain}",
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-G",
-        "Ninja",
-        str(root_dir / "native"),
-    ]
+    @override
+    def run(self) -> None:
+        shutil.rmtree(BUILD, ignore_errors=True)
+        say(f"removed {BUILD}")
 
-    try:
-        run_cmd(cmake_cmd, cwd=build_dir, silent=True)
 
-    except subprocess.CalledProcessError:
-        log_err("Failed to configure CMake for analysis.")
+class Build(Command):
+    name = "build"
+    summary = "compile libclux.a and the cluxd daemon"
 
-    if do_check:
-        run_cmd(["ninja", "syntax"], cwd=build_dir, silent=True)
-        log_ok("C++ syntax")
+    @override
+    def run(self) -> None:
+        ndk = ndk_root()
+        cmake = locate("cmake")
+        cargo = locate("cargo")
+        locate("ninja")
 
-    if do_lint:
-        run_cmd(["ninja", "lint"], cwd=build_dir, silent=True)
-        log_ok("C++ lint")
+        execute([cmake, "--preset", PRESET], LIB_SOURCE)
+        execute([cmake, "--build", "--preset", PRESET], LIB_SOURCE)
 
+        env = {
+            **os.environ,
+            "CLUX_LIB_DIR": str(LIB_OUTPUT),
+            LINKER_VARIABLE: str(ndk_linker(ndk)),
+        }
+        execute([cargo, "build", "--release", "--locked", "--target", TARGET], ROOT, env)
 
-def build_daemon(ndk_path, api_level, build_type, root_dir):
-    log_info(f"Building Daemon [{build_type}] for {ARCH_ABI} (API {api_level})")
+        DIST.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(daemon_binary(), DIST / DAEMON)
+        say(f"daemon: {DIST / DAEMON}")
 
-    build_dir = root_dir / "build" / build_type / ARCH_ABI
 
-    if build_dir.exists():
-        shutil.rmtree(build_dir)
+class Mkmod(Command):
+    name = "mkmod"
+    summary = "build the daemon and package the Magisk module zip"
 
-    build_dir.mkdir(parents=True, exist_ok=True)
+    @override
+    def run(self) -> None:
+        Build().run()
+        shutil.rmtree(STAGE, ignore_errors=True)
+        shutil.copytree(MODULE_SOURCE, STAGE, ignore=shutil.ignore_patterns(*MODULE_EXCLUDED))
+        payload = STAGE / "system" / "bin"
+        payload.mkdir(parents=True)
+        shutil.copy2(daemon_binary(), payload / DAEMON)
+        target = DIST / f"cluxd-v{module_version()}.zip"
+        target.unlink(missing_ok=True)
+        archive(STAGE, target)
+        say(f"module: {target}")
 
-    try:
-        run_cmd(["rustup", "target", "add", RUST_TARGET], silent=True)
 
-    except subprocess.CalledProcessError:
-        log_err(f"Failed to add Rust target: {RUST_TARGET}")
+COMMANDS: Final[tuple[type[Command], ...]] = (Mkmod, Build, Clean)
 
-    toolchain = ndk_path / "build/cmake/android.toolchain.cmake"
 
-    cmake_cmd = [
-        "cmake",
-        "-Wno-dev",
-        "-Wno-deprecated",
-        f"-DANDROID_ABI={ARCH_ABI}",
-        f"-DANDROID_PLATFORM=android-{api_level}",
-        f"-DCMAKE_TOOLCHAIN_FILE={toolchain}",
-        f"-DCMAKE_BUILD_TYPE={build_type}",
-        "-G",
-        "Ninja",
-        str(root_dir / "native"),
-    ]
-
-    log_sub("Configuring CMake...")
-    run_cmd(cmake_cmd, cwd=build_dir, silent=True)
-
-    log_sub("Compiling Daemon...")
-    run_cmd(["ninja"], cwd=build_dir)
-
-    binary = build_dir / "qos_daemon"
-
-    if not binary.exists():
-        log_err("Daemon build failed: binary not found.")
-
-    log_ok("Daemon build successful")
-
-    return binary
-
-
-def extract_version(root_dir):
-    prop_file = root_dir / "magisk-module" / "module.prop"
-
-    if not prop_file.exists():
-        log_err("module.prop not found.")
-
-    content = prop_file.read_text()
-
-    match = re.search(r"^version=(.+)$", content, re.MULTILINE)
-
-    if not match:
-        log_err("Could not parse version from module.prop.")
-
-    return match.group(1).strip()
-
-
-def package_module(root_dir, daemon_bin, version):
-    log_info("Packaging Magisk Module...")
-
-    magisk_dir = root_dir / "magisk-module"
-
-    daemon_dest = magisk_dir / "system" / "bin" / "qos_daemon"
-
-    daemon_dest.parent.mkdir(parents=True, exist_ok=True)
-
-    shutil.copy2(daemon_bin, daemon_dest)
-    log_sub(f"Placed Daemon at {daemon_dest.relative_to(root_dir)}")
-
-    output_dir = root_dir / "scripts" / "output"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    zip_name = f"qos-v{version}"
-    zip_base_path = output_dir / zip_name
-
-    log_sub("Zipping module contents...")
-
-    shutil.make_archive(
-        base_name=str(zip_base_path),
-        format="zip",
-        root_dir=str(magisk_dir),
-    )
-
-    final_zip = output_dir / f"{zip_name}.zip"
-
-    if final_zip.exists():
-        log_ok(
-            f"Module packaged successfully: "
-            f"{Style.BOLD}{final_zip.relative_to(root_dir)}{Style.RESET}"
-        )
-
-    else:
-        log_err("Packaging failed: zip not found.")
-
-
-def main():
-    root_dir = Path(__file__).resolve().parent.parent
-    os.chdir(root_dir)
+def main(argv: Sequence[str] | None = None) -> int:
+    registry = {command.name: command for command in COMMANDS}
+    listing = "\n".join(f"  {name:<6} {registry[name].summary}" for name in registry)
 
     parser = argparse.ArgumentParser(
-        formatter_class=lambda prog: argparse.ArgumentDefaultsHelpFormatter(
-            prog,
-            max_help_position=45,
-            width=100,
-        )
+        prog="build.py",
+        description="Build tool for clux.",
+        epilog=listing,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    parser.add_argument("command", choices=list(registry), help="action to perform")
 
-    parser.add_argument(
-        "--target",
-        choices=["daemon", "module", "all", "none"],
-        default="all",
-        help="Build target",
-    )
-
-    parser.add_argument(
-        "--api",
-        default=DEFAULT_ANDROID_API,
-        help="Android API level",
-    )
-
-    parser.add_argument(
-        "--type",
-        choices=["Release", "Debug"],
-        default=DEFAULT_BUILD_TYPE,
-        help="Build type",
-    )
-
-    parser.add_argument(
-        "--skip-clean",
-        action="store_true",
-        help="Skip workspace cleaning",
-    )
-
-    parser.add_argument(
-        "--skip-check",
-        action="store_true",
-        help="Skip syntax checks",
-    )
-
-    parser.add_argument(
-        "--skip-lint",
-        action="store_true",
-        help="Skip linter",
-    )
-
-    args = parser.parse_args()
-
-    if not args.skip_clean:
-        log_info("Cleaning workspace...")
-        clean_workspace(root_dir)
-
-    do_check = not args.skip_check
-    do_lint = not args.skip_lint
-
-    start = time.time()
-
+    arguments = parser.parse_args(argv)
     try:
-        needs_native_tools = (
-            do_check
-            or do_lint
-            or args.target in ["daemon", "module", "all"]
-        )
+        registry[str(arguments.command)]().run()
+    except subprocess.CalledProcessError as error:
+        return error.returncode
 
-        ndk_path = None
-
-        if needs_native_tools:
-            for tool in ["cmake", "ninja", "rustup", "cargo"]:
-                check_tool(tool)
-
-            ndk_path = find_ndk()
-
-            if not ndk_path:
-                log_err("Android NDK not found. Set ANDROID_NDK_HOME.")
-
-            run_quality_checks(
-                ndk_path,
-                args.api,
-                root_dir,
-                do_check,
-                do_lint,
-            )
-
-        daemon_bin = None
-
-        if args.target in ["daemon", "module", "all"]:
-            daemon_bin = build_daemon(
-                ndk_path,
-                args.api,
-                args.type,
-                root_dir,
-            )
-
-        if args.target in ["module", "all"]:
-            if not daemon_bin:
-                log_err(
-                    "Cannot package module: "
-                    "Missing Daemon artifact."
-                )
-
-            version = extract_version(root_dir)
-
-            package_module(
-                root_dir,
-                daemon_bin,
-                version,
-            )
-
-        elapsed = time.time() - start
-
-        print(
-            f"\n{Style.GREEN}"
-            f"Process finished in {elapsed:.2f}s"
-            f"{Style.RESET}"
-        )
-
-    except KeyboardInterrupt:
-        print("\nCancelled.")
-        sys.exit(0)
-
-    except Exception as exc:
-        log_err(f"Unexpected error: {exc}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
