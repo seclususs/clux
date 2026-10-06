@@ -1,7 +1,7 @@
-id=sys_qos
-name=QoS
-version=2.8
-versionCode=19
+id=cluxd
+name=cluxd
+version=3.0
+versionCode=20
 author=seclususs
-description=Native daemon for system optimization.
-updateJson=https://raw.githubusercontent.com/seclususs/qos-android/main/magisk-module/update.json
+description=Kernel tuning daemon for Android.
+updateJson=https://raw.githubusercontent.com/seclususs/clux/main/modules/update.json
