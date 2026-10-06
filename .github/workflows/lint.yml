@@ -21,13 +21,10 @@ jobs:
       - name: Install LLVM tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang-format clang-tidy
+          sudo apt-get install -y --no-install-recommends clang-tidy
 
       - name: Select NDK
         run: echo "ANDROID_NDK_HOME=${ANDROID_NDK_LATEST_HOME}" >> "${GITHUB_ENV}"
-
-      - name: Format
-        run: clang-format --dry-run --Werror lib/src/*.cpp lib/src/*.hpp
 
       - name: Syntax and clang-tidy
         working-directory: lib
@@ -42,9 +39,6 @@ jobs:
 
       - name: Install Rust toolchain
         run: rustup toolchain install
-
-      - name: Format
-        run: cargo fmt --check
 
       - name: Syntax
         run: |

@@ -49,4 +49,3 @@ CheckOptions:
       value: UPPER_CASE
     - key: readability-function-cognitive-complexity.Threshold
       value: "20"
-...
