@@ -11,7 +11,7 @@ use core::ffi::CStr;
 
 pub use event::{Epoll, FAULT, PRIORITY, READ, Ready, drain, signals};
 pub use fault::{Fault, Outcome};
-pub use node::{Fd, Mode, arm, open, scan, slurp};
+pub use node::{Fd, Mode, arm, debugfs, devno, open, scan, slurp};
 #[cfg_attr(test, allow(unused_imports))]
 pub use proc::abort;
 pub use proc::{

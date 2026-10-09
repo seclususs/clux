@@ -3,7 +3,7 @@
 
 use core::ffi::{c_char, c_void};
 
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
 pub const NODE_READ: u32 = 0;
 pub const NODE_WRITE: u32 = 1;
 pub const NODE_RDWR: u32 = 2;
@@ -36,6 +36,8 @@ unsafe extern "C" {
     pub(super) fn clux_node_close(fd: i32);
     pub(super) fn clux_node_slurp(path: *const c_char, buf: *mut c_void, cap: usize) -> i32;
     pub(super) fn clux_node_scan(dir: *const c_char, buf: *mut c_void, cap: usize) -> i32;
+    pub(super) safe fn clux_node_debugfs() -> i32;
+    pub(super) fn clux_node_devno(path: *const c_char, major: *mut u32, minor: *mut u32) -> i32;
     pub(super) fn clux_psi_arm(path: *const c_char, threshold_us: u32, window_us: u32) -> i32;
     pub(super) safe fn clux_epoll_open() -> i32;
     pub(super) safe fn clux_epoll_add(ep: i32, fd: i32, token: u64, flags: u32) -> i32;

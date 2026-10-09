@@ -31,3 +31,5 @@ CLUX_API int32_t clux_node_write(int32_t fd, const void *buf, size_t len);
 CLUX_API void clux_node_close(int32_t fd);
 CLUX_API int32_t clux_node_slurp(const char *path, void *buf, size_t cap);
 CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap);
+CLUX_API int32_t clux_node_debugfs(void);
+CLUX_API int32_t clux_node_devno(const char *path, uint32_t *major_out, uint32_t *minor_out);

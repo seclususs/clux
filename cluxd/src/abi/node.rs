@@ -72,6 +72,17 @@ pub fn scan(dir: &CStr, buf: &mut [u8]) -> Outcome<usize> {
     size(unsafe { raw::clux_node_scan(dir.as_ptr(), buf.as_mut_ptr().cast(), buf.len()) })
 }
 
+pub fn debugfs() -> Outcome<()> {
+    check(raw::clux_node_debugfs()).map(|_| ())
+}
+
+pub fn devno(path: &CStr) -> Outcome<(u32, u32)> {
+    let mut major = 0_u32;
+    let mut minor = 0_u32;
+    let ret = unsafe { raw::clux_node_devno(path.as_ptr(), &raw mut major, &raw mut minor) };
+    check(ret).map(|_| (major, minor))
+}
+
 pub fn arm(path: &CStr, threshold_us: u32, window_us: u32) -> Outcome<Fd> {
     descriptor(unsafe { raw::clux_psi_arm(path.as_ptr(), threshold_us, window_us) })
 }

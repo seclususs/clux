@@ -4,10 +4,14 @@
 #include "node.hpp"
 
 #include <fcntl.h>
+#include <sched.h>
 #include <string.h>
 
 #include <linux/magic.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/sysmacros.h>
 #include <sys/vfs.h>
 
 namespace clux::node
@@ -18,6 +22,7 @@ namespace
 
 constexpr size_t DIRENT_RECLEN = 16;
 constexpr size_t DIRENT_NAME = 19;
+constexpr const char *DEBUGFS_ROOT = "/sys/kernel/debug";
 
 int access_flags(uint32_t mode) noexcept
 {
@@ -87,7 +92,8 @@ bool pseudo(int fd) noexcept
     using Magic = decltype(info.f_type);
     const Magic type = info.f_type;
 
-    return type == static_cast<Magic>(PROC_SUPER_MAGIC) || type == static_cast<Magic>(SYSFS_MAGIC);
+    return type == static_cast<Magic>(PROC_SUPER_MAGIC) ||
+           type == static_cast<Magic>(SYSFS_MAGIC) || type == static_cast<Magic>(DEBUGFS_MAGIC);
 }
 
 int32_t put(const char *path, const char *text) noexcept
@@ -184,7 +190,8 @@ CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap)
     clux::node::Packer packer{.out = static_cast<char *>(buf), .cap = cap, .used = 0};
 
     for (;;) {
-        const long got = ::syscall(SYS_getdents64, fd.get(), chunk, sizeof(chunk));
+        const long got =
+            ::syscall(SYS_getdents64, static_cast<long>(fd.get()), chunk, sizeof(chunk));
 
         if (got < 0 && errno == EINTR) {
             continue;
@@ -203,4 +210,43 @@ CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap)
             return packed;
         }
     }
+}
+
+CLUX_API int32_t clux_node_devno(const char *path, uint32_t *major_out, uint32_t *minor_out)
+{
+    if (path == nullptr || major_out == nullptr || minor_out == nullptr) {
+        return -EINVAL;
+    }
+
+    struct stat st{};
+    if (clux::retry([&] { return ::stat(path, &st); }) < 0) {
+        return clux::fail();
+    }
+
+    const auto major_id = static_cast<uint32_t>(major(st.st_dev));
+    if (major_id == 0) {
+        return -ENODEV;
+    }
+
+    *major_out = major_id;
+    *minor_out = static_cast<uint32_t>(minor(st.st_dev));
+    return 0;
+}
+
+CLUX_API int32_t clux_node_debugfs(void)
+{
+    if (::unshare(CLONE_NEWNS) != 0) {
+        return clux::fail();
+    }
+
+    if (::mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr) != 0) {
+        return clux::fail();
+    }
+
+    const unsigned long flags = MS_NOSUID | MS_NODEV | MS_NOEXEC;
+    if (::mount("debugfs", clux::node::DEBUGFS_ROOT, "debugfs", flags, nullptr) != 0) {
+        return clux::fail();
+    }
+
+    return 0;
 }

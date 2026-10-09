@@ -13,7 +13,7 @@
 namespace clux
 {
 
-constexpr uint32_t ABI_VERSION = 1;
+constexpr uint32_t ABI_VERSION = 2;
 constexpr size_t IO_LIMIT = 65536;
 
 [[nodiscard]] inline int32_t fail() noexcept
