@@ -36,6 +36,7 @@ constexpr long IOPRIO_CLASS_BEST_EFFORT = 2;
 constexpr long IOPRIO_CLASS_SHIFT = 13;
 constexpr uint64_t ATTR_KEEP_POLICY = 0x08;
 constexpr uint64_t ATTR_KEEP_PARAMS = 0x10;
+constexpr uint64_t ATTR_CLAMP_MIN = 0x20;
 constexpr uint64_t ATTR_CLAMP_MAX = 0x40;
 
 struct Attr {
@@ -234,9 +235,10 @@ CLUX_API int32_t clux_proc_clamp(uint32_t util_max)
 {
     Attr attr{};
     attr.size = sizeof(Attr);
-    attr.flags = ATTR_KEEP_POLICY | ATTR_KEEP_PARAMS | ATTR_CLAMP_MAX;
+    attr.flags = ATTR_KEEP_POLICY | ATTR_KEEP_PARAMS | ATTR_CLAMP_MIN | ATTR_CLAMP_MAX;
+    attr.util_min = 0;
     attr.util_max = util_max;
-    return ::syscall(SYS_sched_setattr, 0, &attr, 0U) == 0 ? 0 : clux::fail();
+    return ::syscall(SYS_sched_setattr, 0L, &attr, 0UL) == 0 ? 0 : clux::fail();
 }
 
 CLUX_API int32_t clux_proc_ioprio(void)

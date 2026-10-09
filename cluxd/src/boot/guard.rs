@@ -23,9 +23,11 @@ pub fn harden() {
         report(abi::pin(mask), c"cpu affinity failed");
     }
     report(abi::ioprio(), c"io priority failed");
-    report(abi::slack(SLACK_NS), c"timer slack failed");
-    report(abi::realtime(PRIORITY), c"realtime policy failed");
     report(abi::clamp(UTIL_MAX), c"utilization clamp failed");
+    if abi::realtime(PRIORITY).is_err() {
+        log::warn(c"realtime policy failed, using timer slack");
+        report(abi::slack(SLACK_NS), c"timer slack failed");
+    }
     report(abi::lockmem(), c"memory lock failed");
 }
 
