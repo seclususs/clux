@@ -7,7 +7,6 @@ use super::lexer;
 use super::path::Path;
 use crate::abi;
 
-const DISKS: [&[u8]; 4] = [b"nvme0n1", b"sda", b"sdb", b"mmcblk0"];
 const ZONES: &CStr = c"/sys/class/thermal";
 const PRIORITY: [&[u8]; 31] = [
     b"cpu-1-0-usr",
@@ -66,28 +65,9 @@ const BANNED: [&[u8]; 20] = [
     b"backlight",
 ];
 const ZONE_PREFIX: &[u8] = b"thermal_zone";
-const LIST_CAP: usize = 4096;
+const LIST_CAP: usize = 16384;
 const KIND_CAP: usize = 48;
 const CORE_LIMIT: u32 = 64;
-
-#[derive(Clone, Copy, Debug)]
-pub struct Disk {
-    dev: &'static [u8],
-}
-
-impl Disk {
-    pub fn find() -> Option<Self> {
-        DISKS.iter().find_map(|&dev| {
-            let probe = Self { dev };
-            let path = probe.node(b"/queue/nr_requests")?;
-            abi::open(path.cstr()?, abi::Mode::Read).ok().map(|_| probe)
-        })
-    }
-
-    pub fn node(self, tail: &[u8]) -> Option<Path<64>> {
-        Path::new().push(b"/sys/block/")?.push(self.dev)?.push(tail)
-    }
-}
 
 pub fn read_uint(path: &CStr) -> Option<u64> {
     let mut buf = [0_u8; 24];

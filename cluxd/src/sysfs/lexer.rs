@@ -51,6 +51,13 @@ pub fn int(text: &[u8]) -> Option<i64> {
     }
 }
 
+pub fn pair(text: &[u8]) -> Option<(u32, u32)> {
+    let (head, tail) = text.split_at(text.iter().position(|&byte| byte == b':')?);
+    let major = u32::try_from(uint(head)?).ok()?;
+    let minor = u32::try_from(uint(tail.get(1..)?)?).ok()?;
+    Some((major, minor))
+}
+
 pub fn centi(text: &[u8]) -> Option<u32> {
     let mut state = Fixed::Start;
     let mut whole: u32 = 0;
@@ -162,5 +169,23 @@ mod tests {
     fn words_skip_runs_of_blanks() {
         let got: Vec<&[u8]> = words(b"  12   7\t9 \n").collect();
         assert_eq!(got, [b"12".as_slice(), b"7".as_slice(), b"9".as_slice()]);
+    }
+
+    #[test]
+    fn pair_parses_major_minor_lines() {
+        assert_eq!(pair(b"8:0\n"), Some((8, 0)));
+        assert_eq!(pair(b"259:65537\n"), Some((259, 65537)));
+        assert_eq!(pair(b"254:3"), Some((254, 3)));
+    }
+
+    #[test]
+    fn pair_rejects_malformed_lines() {
+        assert_eq!(pair(b""), None);
+        assert_eq!(pair(b"8"), None);
+        assert_eq!(pair(b":3"), None);
+        assert_eq!(pair(b"8:"), None);
+        assert_eq!(pair(b"8:x"), None);
+        assert_eq!(pair(b"8 : 3"), None);
+        assert_eq!(pair(b"99999999999:1"), None);
     }
 }

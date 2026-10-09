@@ -9,8 +9,8 @@ use crate::abi::{self, Fault, Fd, Mode, Outcome};
 use crate::event::slot::{Cause, Unit};
 use crate::psi::Bus;
 use crate::psi::gauge::{Gauge, Trigger};
+use crate::sysfs::disk::Disk;
 use crate::sysfs::knob::Knob;
-use crate::sysfs::probe::Disk;
 
 const PRESSURE: &CStr = c"/proc/pressure/io";
 const TRIGGER: Trigger = Trigger {
