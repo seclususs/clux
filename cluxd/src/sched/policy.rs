@@ -4,7 +4,7 @@
 use super::table::{
     ENTER, GRANULARITY_MAX, GRANULARITY_MIN, GRANULARITY_PERCENT, GRANULARITY_STEP, HOLD_US,
     IO_FLOOR, IO_HEAVY, LATENCY, LATENCY_MIN, LATENCY_SPAN, LEAVE, MIGRATION, MIGRATION_FLOOR,
-    PACE_CEILING, PACE_MS, PACE_PATIENCE, PACES, RUNGS, UCLAMP, VOLATILE_SLOPE, WAKEUP, WALT,
+    PACE_CEILING, PACE_MS, PACE_PATIENCE, PACES, RUNGS, VOLATILE_SLOPE, WAKEUP, WALT,
 };
 use crate::automata::cadence::Cadence;
 use crate::automata::fixed::{at, floor_to, ratio, scaled};
@@ -27,7 +27,7 @@ pub struct Plan {
     pub wakeup: u32,
     pub migration: u32,
     pub walt: u32,
-    pub uclamp: u32,
+    pub boost: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -124,7 +124,7 @@ fn plan(shown: usize, eager: usize, input: Input) -> Plan {
         wakeup: at(&WAKEUP, eager),
         migration,
         walt: at(&WALT, shown),
-        uclamp: scaled(at(&UCLAMP, shown), scale),
+        boost: scale,
     }
 }
 
@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(plan.wakeup, 6_500_000);
         assert_eq!(plan.migration, 600_000);
         assert_eq!(plan.walt, 10);
-        assert_eq!(plan.uclamp, 0);
+        assert_eq!(plan.boost, 1000);
     }
 
     #[test]
@@ -183,11 +183,11 @@ mod tests {
         assert_eq!(plan.wakeup, 1_500_000);
         assert_eq!(plan.migration, 200_000);
         assert_eq!(plan.walt, 40);
-        assert_eq!(plan.uclamp, 384);
+        assert_eq!(plan.boost, 1000);
     }
 
     #[test]
-    fn thermal_scale_raises_latency_floor_and_trims_boost() {
+    fn thermal_scale_raises_latency_floor_and_caps_boost() {
         let mut policy = Policy::new();
         let hot = Verdict {
             scale: 400,
@@ -195,7 +195,7 @@ mod tests {
         };
         let plan = policy.step(input(400, 0, 0, hot), 0, false).plan;
         assert_eq!(plan.latency, 15_200_000);
-        assert_eq!(plan.uclamp, 153);
+        assert_eq!(plan.boost, 400);
     }
 
     #[test]

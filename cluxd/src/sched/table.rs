@@ -12,7 +12,6 @@ pub const LATENCY: [u32; RUNGS] = [20_000_000, 16_000_000, 12_000_000, 10_000_00
 pub const WAKEUP: [u32; RUNGS] = [6_500_000, 5_000_000, 3_500_000, 2_500_000, 1_500_000];
 pub const MIGRATION: [u32; RUNGS] = [600_000, 500_000, 400_000, 300_000, 200_000];
 pub const WALT: [u32; RUNGS] = [10, 14, 22, 30, 40];
-pub const UCLAMP: [u32; RUNGS] = [0, 48, 128, 256, 384];
 
 pub const PACE_MS: [u32; PACES] = [100, 250, 500, 1000, 2500, 5000, 10_000];
 pub const PACE_CEILING: [usize; RUNGS] = [6, 4, 2, 1, 0];
