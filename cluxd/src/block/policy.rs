@@ -14,7 +14,7 @@ const PRESSURE_HOLD_US: u64 = 2_000_000;
 const PATTERN_ENTER: [u32; 4] = [0, 100, 300, 600];
 const PATTERN_LEAVE: [u32; 4] = [0, 60, 220, 500];
 const PATTERN_HOLD_US: u64 = 3_000_000;
-const DEPTH: [u32; 4] = [256, 192, 128, 64];
+const SHARE: [u32; 4] = [1000, 750, 500, 250];
 const READ_AHEAD: [u32; 4] = [128, 256, 512, 1024];
 const PACE_MS: [u32; 4] = [100, 250, 1000, 5000];
 const PACE_CEILING: [usize; 4] = [3, 2, 1, 0];
@@ -34,7 +34,7 @@ pub struct Input {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Plan {
     pub read_ahead: u32,
-    pub depth: u32,
+    pub share: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -83,7 +83,7 @@ impl Policy {
         Decision {
             plan: Plan {
                 read_ahead: at(&READ_AHEAD, self.pattern.rung()),
-                depth: at(&DEPTH, rung),
+                share: at(&SHARE, rung),
             },
             next_us: self
                 .cadence
@@ -116,7 +116,7 @@ mod tests {
     }
 
     #[test]
-    fn idle_disk_keeps_deep_queue_and_small_readahead() {
+    fn idle_disk_keeps_full_queue_and_small_readahead() {
         let mut policy = Policy::new();
         let plan = policy
             .step(
@@ -132,7 +132,7 @@ mod tests {
             plan,
             Plan {
                 read_ahead: 128,
-                depth: 256
+                share: 1000
             }
         );
     }
@@ -150,7 +150,7 @@ mod tests {
                 false,
             )
             .plan;
-        assert_eq!(plan.depth, 64);
+        assert_eq!(plan.share, 250);
     }
 
     #[test]
@@ -166,7 +166,7 @@ mod tests {
                 false,
             )
             .plan;
-        assert_eq!(slow.depth, 128);
+        assert_eq!(slow.share, 500);
         let mut policy = Policy::new();
         let stalled = policy
             .step(
@@ -178,7 +178,7 @@ mod tests {
                 false,
             )
             .plan;
-        assert_eq!(stalled.depth, 64);
+        assert_eq!(stalled.share, 250);
     }
 
     #[test]
@@ -186,7 +186,7 @@ mod tests {
         let mut policy = Policy::new();
         let mut plan = Plan {
             read_ahead: 0,
-            depth: 0,
+            share: 0,
         };
         for tick in 0..8 {
             plan = policy
@@ -214,7 +214,7 @@ mod tests {
                 .plan;
         }
         assert_eq!(plan.read_ahead, 128);
-        assert_eq!(plan.depth, 256);
+        assert_eq!(plan.share, 1000);
     }
 
     #[test]
