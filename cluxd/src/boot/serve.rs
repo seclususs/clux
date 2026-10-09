@@ -23,37 +23,46 @@ pub fn run(reactor: &mut Reactor) -> Outcome<()> {
     let mut block = Slot::<block::Governor>::new(event::BLOCK);
     let mut sched = Slot::<sched::Governor>::new(event::SCHED);
 
+    let outcome = cycle(reactor, &mut bus, &mut block, &mut sched);
+
+    block.retire();
+    sched.retire();
+    outcome
+}
+
+fn cycle(
+    reactor: &mut Reactor,
+    bus: &mut Bus,
+    block: &mut Slot<block::Governor>,
+    sched: &mut Slot<sched::Governor>,
+) -> Outcome<()> {
     loop {
         let wake = reactor.wait(timeout(abi::now_us(), [block.deadline(), sched.deadline()]))?;
         if wake.stop {
-            break;
+            return Ok(());
         }
 
         let now = abi::now_us();
         let epoll = reactor.epoll();
 
         if wake.faulted(block.token()) {
-            block.collapse(epoll, now);
+            block.collapse(epoll, now, bus);
         } else if wake.fired(block.token()) {
-            block.pump(epoll, now, &mut bus, Cause::Trigger);
+            block.pump(epoll, now, bus, Cause::Trigger);
         }
 
         if wake.faulted(sched.token()) {
-            sched.collapse(epoll, now);
+            sched.collapse(epoll, now, bus);
         } else if wake.fired(sched.token()) {
-            sched.pump(epoll, now, &mut bus, Cause::Trigger);
+            sched.pump(epoll, now, bus, Cause::Trigger);
         }
 
-        block.pump(epoll, now, &mut bus, Cause::Timer);
-        sched.pump(epoll, now, &mut bus, Cause::Timer);
+        block.pump(epoll, now, bus, Cause::Timer);
+        sched.pump(epoll, now, bus, Cause::Timer);
 
         if block.dead() && sched.dead() {
             log::warn(c"no governor can run on this device");
-            break;
+            return Ok(());
         }
     }
-
-    block.retire();
-    sched.retire();
-    Ok(())
 }
