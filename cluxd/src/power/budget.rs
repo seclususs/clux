@@ -16,6 +16,29 @@ const MARGIN_START: i32 = 355;
 const MARGIN_SPAN: i32 = 50;
 const BATTERY_LIMIT: i32 = 405;
 const CRITICAL_INPUT: u32 = 575;
+const CPU_TTL_US: u64 = 60 * SECOND;
+const HEAT_TTL_US: u64 = 120 * SECOND;
+const LEVEL_TTL_US: u64 = 600 * SECOND;
+
+#[derive(Clone, Copy, Debug)]
+struct Aged<T> {
+    value: T,
+    at_us: u64,
+}
+
+fn renew<T: Copy>(held: Option<Aged<T>>, reading: Option<T>, now_us: u64) -> Option<Aged<T>> {
+    reading
+        .map(|value| Aged {
+            value,
+            at_us: now_us,
+        })
+        .or(held)
+}
+
+fn fresh<T: Copy>(held: Option<Aged<T>>, now_us: u64, ttl_us: u64) -> Option<T> {
+    held.filter(|aged| now_us.saturating_sub(aged.at_us) <= ttl_us)
+        .map(|aged| aged.value)
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Reading {
@@ -34,8 +57,9 @@ pub struct Verdict {
 pub struct Budget {
     thermal: Ladder<4>,
     battery: Ladder<4>,
-    cpu: Option<i32>,
-    heat: Option<i32>,
+    cpu: Option<Aged<i32>>,
+    heat: Option<Aged<i32>>,
+    level: Option<Aged<u32>>,
 }
 
 impl Budget {
@@ -45,32 +69,39 @@ impl Budget {
             battery: Ladder::new(BATTERY_ENTER, BATTERY_LEAVE, BATTERY_HOLD_US),
             cpu: None,
             heat: None,
+            level: None,
         }
     }
 
-    pub fn feed(&mut self, reading: Reading, now_us: u64) {
-        self.cpu = reading.cpu.or(self.cpu);
-        self.heat = reading.battery.or(self.heat);
+    pub fn lost(&self, now_us: u64) -> bool {
+        self.cpu.is_some() && fresh(self.cpu, now_us, CPU_TTL_US).is_none()
+    }
 
-        if let Some(cpu) = self.cpu {
-            let margin = self.heat.map_or(0, |heat| {
+    pub fn feed(&mut self, reading: Reading, now_us: u64) {
+        self.cpu = renew(self.cpu, reading.cpu, now_us);
+        self.heat = renew(self.heat, reading.battery, now_us);
+        self.level = renew(self.level, reading.level, now_us);
+
+        let heat = fresh(self.heat, now_us, HEAT_TTL_US);
+        let input = fresh(self.cpu, now_us, CPU_TTL_US).map_or(0, |cpu| {
+            let margin = heat.map_or(0, |heat| {
                 heat.saturating_sub(MARGIN_START).clamp(0, MARGIN_SPAN)
             });
 
-            let mut input = u32::try_from(cpu.saturating_add(margin).max(0)).unwrap_or(0);
-
-            if self.heat.is_some_and(|heat| heat >= BATTERY_LIMIT) {
-                input = input.max(CRITICAL_INPUT);
+            let input = u32::try_from(cpu.saturating_add(margin).max(0)).unwrap_or(0);
+            if heat.is_some_and(|heat| heat >= BATTERY_LIMIT) {
+                input.max(CRITICAL_INPUT)
+            } else {
+                input
             }
+        });
 
-            let _ = self.thermal.step(input, now_us);
-        }
+        let _ = self.thermal.step(input, now_us);
 
-        if let Some(level) = reading.level {
-            let _ = self
-                .battery
-                .step(100_u32.saturating_sub(level.min(100)), now_us);
-        }
+        let used = fresh(self.level, now_us, LEVEL_TTL_US)
+            .map_or(0, |level| 100_u32.saturating_sub(level.min(100)));
+
+        let _ = self.battery.step(used, now_us);
     }
 
     pub fn verdict(&self) -> Verdict {
@@ -166,5 +197,58 @@ mod tests {
         budget.feed(reading(540, 300, 90), S);
         budget.feed(Reading::default(), 2 * S);
         assert_eq!(budget.verdict().scale, 400);
+    }
+
+    #[test]
+    fn a_lost_sensor_expires_instead_of_throttling_forever() {
+        let mut budget = Budget::new();
+        budget.feed(reading(540, 300, 90), S);
+        assert_eq!(budget.verdict().scale, 400);
+        budget.feed(Reading::default(), 30 * S);
+        assert_eq!(budget.verdict().scale, 400);
+        assert!(!budget.lost(30 * S));
+        budget.feed(Reading::default(), 70 * S);
+        assert!(budget.lost(70 * S));
+        assert_eq!(budget.verdict().scale, 400);
+        budget.feed(Reading::default(), 91 * S);
+        assert_eq!(budget.verdict().scale, 1000);
+    }
+
+    #[test]
+    fn a_sensor_that_never_existed_is_not_lost() {
+        let mut budget = Budget::new();
+        for tick in 0..10 {
+            budget.feed(Reading::default(), tick * 100 * S);
+            assert!(!budget.lost(tick * 100 * S));
+        }
+        assert_eq!(budget.verdict().scale, 1000);
+    }
+
+    #[test]
+    fn stale_battery_heat_stops_forcing_the_critical_rung() {
+        let mut budget = Budget::new();
+        budget.feed(reading(300, 410, 90), 0);
+        assert_eq!(budget.verdict().scale, 150);
+        for tick in 1..=4 {
+            budget.feed(
+                Reading {
+                    cpu: Some(300),
+                    battery: None,
+                    level: Some(90),
+                },
+                tick * 60 * S,
+            );
+        }
+        assert_eq!(budget.verdict().scale, 1000);
+    }
+
+    #[test]
+    fn stale_charge_level_releases_the_battery_ceiling() {
+        let mut budget = Budget::new();
+        budget.feed(reading(400, 300, 8), 0);
+        assert_eq!(budget.verdict().ceiling, 1);
+        budget.feed(Reading::default(), 700 * S);
+        budget.feed(Reading::default(), 740 * S);
+        assert_eq!(budget.verdict().ceiling, 4);
     }
 }
