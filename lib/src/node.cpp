@@ -55,6 +55,10 @@ int32_t pack(Packer &packer, const char *chunk, size_t bytes) noexcept
     while (pos < bytes) {
         uint16_t reclen = 0;
 
+        if (bytes - pos < DIRENT_NAME) {
+            return -EIO;
+        }
+
         ::memcpy(&reclen, chunk + pos + DIRENT_RECLEN, sizeof(reclen));
         if (reclen <= DIRENT_NAME || pos + reclen > bytes) {
             return -EIO;
