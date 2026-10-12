@@ -46,6 +46,7 @@ unsafe extern "C" {
     pub(super) safe fn clux_signal_open() -> i32;
     pub(super) safe fn clux_signal_drain(fd: i32) -> i32;
     pub(super) fn clux_prop_get(key: *const c_char, out: *mut c_char, cap: usize) -> i32;
+    pub(super) fn clux_log_open(path: *const c_char, cap: u32) -> i32;
     pub(super) fn clux_log(level: u32, msg: *const c_char);
     pub(super) fn clux_log_num(level: u32, msg: *const c_char, value: i64);
     pub(super) safe fn clux_proc_root() -> i32;

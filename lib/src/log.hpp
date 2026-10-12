@@ -5,5 +5,6 @@
 
 #include "base.hpp"
 
+CLUX_API int32_t clux_log_open(const char *path, uint32_t cap);
 CLUX_API void clux_log(uint32_t level, const char *msg);
 CLUX_API void clux_log_num(uint32_t level, const char *msg, int64_t value);

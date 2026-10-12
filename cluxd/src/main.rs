@@ -19,7 +19,16 @@ mod sysfs;
 
 #[cfg(not(test))]
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    static PANICKING: AtomicBool = AtomicBool::new(false);
+
+    if !PANICKING.swap(true, Ordering::Relaxed) {
+        let line = info.location().map_or(0, |at| i64::from(at.line()));
+        log::num(log::Level::Error, c"panic at line", line);
+    }
+
     abi::abort()
 }
 

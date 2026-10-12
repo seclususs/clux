@@ -34,6 +34,10 @@ pub fn prop(key: &CStr, buf: &mut [u8]) -> Outcome<usize> {
     usize::try_from(check(got)?).map_err(|_| Fault::Parse)
 }
 
+pub fn sink(path: &CStr, cap: u32) -> Outcome<()> {
+    check(unsafe { raw::clux_log_open(path.as_ptr(), cap) }).map(|_| ())
+}
+
 #[cfg(not(test))]
 pub fn note(level: u32, msg: &CStr) {
     unsafe { raw::clux_log(level, msg.as_ptr()) }

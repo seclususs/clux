@@ -8,12 +8,18 @@ use crate::log::{self, Level};
 use crate::sysfs::probe;
 
 const LOCK: &CStr = c"/data/local/tmp/cluxd.lock";
+const LOG: &CStr = c"/data/local/tmp/cluxd.log";
+const LOG_CAP: u32 = 65_536;
 const PRIORITY: u32 = 1;
 const UTIL_MAX: u32 = 102;
 const SLACK_NS: u64 = 50_000_000;
 
 pub fn claim() -> Outcome<Fd> {
     abi::lock(LOCK)
+}
+
+pub fn persist() {
+    report(abi::sink(LOG, LOG_CAP), c"log file unavailable");
 }
 
 pub fn harden() {

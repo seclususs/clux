@@ -75,6 +75,10 @@ impl<const N: usize> Path<N> {
         self.push(Decimal::new(value).digits())
     }
 
+    pub fn bytes(&self) -> &[u8] {
+        self.buf.get(..self.len).unwrap_or_default()
+    }
+
     pub fn cstr(&self) -> Option<&CStr> {
         CStr::from_bytes_until_nul(&self.buf).ok()
     }

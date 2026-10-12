@@ -44,6 +44,16 @@ pub trait Unit: Sized {
     fn vacate(bus: &mut Bus);
 }
 
+const fn severity(fault: Fault, streak: u32) -> Level {
+    if matches!(fault, Fault::Absent) {
+        Level::Warn
+    } else if fault.fatal() || streak == BACKOFF_STEPS {
+        Level::Error
+    } else {
+        Level::Warn
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Phase {
     Down(u64),
@@ -154,13 +164,14 @@ impl<U: Unit> Slot<U> {
     }
 
     fn reschedule(&mut self, now_us: u64, fault: Fault) {
-        log::num(Level::Warn, U::FAILED, fault.code());
+        let streak = self.failures.saturating_add(1);
+        log::num(severity(fault, streak), U::FAILED, fault.code());
         self.phase = if fault.fatal() {
             Phase::Dead
         } else {
             Phase::Down(now_us.saturating_add(self.backoff_us()))
         };
-        self.failures = self.failures.saturating_add(1).min(BACKOFF_STEPS);
+        self.failures = streak.min(BACKOFF_STEPS);
     }
 
     fn backoff_us(&self) -> u64 {
@@ -340,5 +351,55 @@ mod tests {
         slot.pump(&Null, stable, &mut bus, Cause::Timer);
         slot.collapse(&Null, stable, &mut bus);
         assert_eq!(slot.deadline(), Some(stable.saturating_add(COOLDOWN_US)));
+    }
+
+    #[test]
+    fn environment_failures_are_errors_at_once() {
+        for errno in [1, 13, 95] {
+            assert_eq!(
+                severity(Fault::errno(-errno), 1),
+                Level::Error,
+                "errno {errno} is a permanent environment fault"
+            );
+        }
+    }
+
+    #[test]
+    fn a_missing_feature_is_not_an_error() {
+        assert_eq!(
+            severity(Fault::Absent, 1),
+            Level::Warn,
+            "absent on first try"
+        );
+        assert_eq!(
+            severity(Fault::Absent, BACKOFF_STEPS),
+            Level::Warn,
+            "absent never escalates"
+        );
+    }
+
+    #[test]
+    fn early_transient_failures_stay_warnings() {
+        for streak in 1..BACKOFF_STEPS {
+            assert_eq!(
+                severity(Fault::errno(-5), streak),
+                Level::Warn,
+                "streak {streak}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_streak_reaching_the_cap_is_reported_once() {
+        assert_eq!(
+            severity(Fault::errno(-5), BACKOFF_STEPS),
+            Level::Error,
+            "cap reached"
+        );
+        assert_eq!(
+            severity(Fault::errno(-5), BACKOFF_STEPS.saturating_add(1)),
+            Level::Warn,
+            "repeats beyond the cap stay quiet"
+        );
     }
 }

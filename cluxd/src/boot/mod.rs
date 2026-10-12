@@ -29,6 +29,8 @@ pub fn run() -> i32 {
         return EXIT_ROOT;
     }
 
+    guard::persist();
+
     if abi::detach().is_err() {
         log::error(c"detach failed");
         return EXIT_DETACH;
