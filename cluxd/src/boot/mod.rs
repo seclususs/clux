@@ -53,6 +53,8 @@ pub fn run() -> i32 {
         Flow::Proceed => serve::run(&mut reactor),
     });
 
+    abi::settle();
+
     match outcome {
         Ok(()) => {
             log::info(c"cluxd stopped");

@@ -43,6 +43,10 @@ impl Knob {
             .ok();
 
         let origin = node.as_ref().and_then(Self::probe);
+        if let Some(value) = origin {
+            let _ = abi::journal(path, value);
+        }
+
         Self {
             node,
             origin,

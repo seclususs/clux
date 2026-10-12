@@ -8,17 +8,26 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <sys/stat.h>
+
 #define CLUX_API extern "C" __attribute__((visibility("default")))
 
 namespace clux
 {
 
-constexpr uint32_t ABI_VERSION = 2;
+constexpr uint32_t ABI_VERSION = 3;
 constexpr size_t IO_LIMIT = 65536;
+constexpr mode_t WRITABLE_BY_OTHERS = 022;
 
 [[nodiscard]] inline int32_t fail() noexcept
 {
     return -errno;
+}
+
+[[nodiscard]] inline bool trusted(const struct stat &st) noexcept
+{
+    return S_ISREG(st.st_mode) && st.st_uid == 0 && st.st_nlink == 1 &&
+           (st.st_mode & WRITABLE_BY_OTHERS) == 0;
 }
 
 class Fd

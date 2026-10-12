@@ -24,6 +24,14 @@ pub fn lock(path: &CStr) -> Outcome<Fd> {
     check(fd).map(|_| Fd::adopt(fd))
 }
 
+pub fn journal(node: &CStr, origin: u32) -> Outcome<()> {
+    unit(unsafe { raw::clux_proc_journal(node.as_ptr(), origin) })
+}
+
+pub fn settle() {
+    raw::clux_proc_settle();
+}
+
 pub fn shield() -> Outcome<()> {
     unit(raw::clux_proc_shield())
 }

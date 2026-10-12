@@ -9,6 +9,7 @@
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <sys/file.h>
 #include <sys/mman.h>
@@ -22,9 +23,13 @@ namespace
 
 constexpr mode_t LOCK_MODE = 0600;
 constexpr mode_t DAEMON_UMASK = 077;
-constexpr mode_t WRITABLE_BY_OTHERS = 022;
 constexpr int STD_FDS = 3;
-constexpr size_t PID_CAP = 24;
+constexpr size_t LEDGER_CAP = 2048;
+constexpr size_t NODE_CAP = 96;
+constexpr size_t BOOT_CAP = 48;
+constexpr size_t VALUE_CAP = 16;
+constexpr const char *BOOT_NODE = "/proc/sys/kernel/random/boot_id";
+constexpr const char *BOOT_UNKNOWN = "-";
 constexpr const char *OOM_NODE = "/proc/self/oom_score_adj";
 constexpr const char *OOM_SHIELD = "-1000\n";
 constexpr rlim_t LIMIT_NOFILE = 64;
@@ -61,10 +66,124 @@ struct Limit {
     rlim_t cap;
 };
 
-bool trusted(const struct stat &st) noexcept
+struct Ledger {
+    int fd;
+    size_t used;
+    char text[LEDGER_CAP];
+};
+
+struct Entry {
+    uint32_t value;
+    char node[NODE_CAP];
+};
+
+Ledger ledger = {.fd = -1, .used = 0, .text = {}};
+
+const char *skip_line(const char *text) noexcept
 {
-    return S_ISREG(st.st_mode) && st.st_uid == 0 && st.st_nlink == 1 &&
-           (st.st_mode & WRITABLE_BY_OTHERS) == 0;
+    const char *end = ::strchr(text, '\n');
+    return end == nullptr ? nullptr : end + 1;
+}
+
+const char *skip_header(const char *text) noexcept
+{
+    const char *first = skip_line(text);
+    return first == nullptr ? nullptr : skip_line(first);
+}
+
+bool parse_entry(const char *&cursor, Entry &entry) noexcept
+{
+    uint64_t value = 0;
+    const char *at = cursor;
+
+    while (*at >= '0' && *at <= '9') {
+        value = (value * 10) + static_cast<uint64_t>(*at - '0');
+        if (value > UINT32_MAX) {
+            return false;
+        }
+
+        ++at;
+    }
+
+    if (at == cursor || *at != ' ') {
+        return false;
+    }
+
+    ++at;
+    const char *end = ::strchr(at, '\n');
+    const size_t len = end == nullptr ? 0 : static_cast<size_t>(end - at);
+    if (len == 0 || len >= NODE_CAP) {
+        return false;
+    }
+
+    ::memcpy(entry.node, at, len);
+    entry.node[len] = '\0';
+    entry.value = static_cast<uint32_t>(value);
+    cursor = end + 1;
+    return true;
+}
+
+bool known(const char *node, size_t len) noexcept
+{
+    const char *cursor = skip_header(ledger.text);
+    Entry entry{};
+
+    while (cursor != nullptr && *cursor != '\0' && parse_entry(cursor, entry)) {
+        if (::strncmp(entry.node, node, len + 1) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool boot_id(char (&out)[BOOT_CAP]) noexcept
+{
+    const int32_t got = clux_node_slurp(BOOT_NODE, out, sizeof(out) - 1);
+    if (got <= 0) {
+        return false;
+    }
+
+    auto len = static_cast<size_t>(got);
+    while (len > 0 && (out[len - 1] == '\n' || out[len - 1] == '\r')) {
+        --len;
+    }
+
+    out[len] = '\0';
+    return len > 0;
+}
+
+void recover(const char *old, const char *boot) noexcept
+{
+    const char *cursor = skip_line(old);
+    const size_t len = ::strlen(boot);
+
+    if (cursor == nullptr || ::strncmp(cursor, boot, len) != 0 || cursor[len] != '\n') {
+        return;
+    }
+
+    cursor += len + 1;
+    Entry entry{};
+
+    while (*cursor != '\0' && parse_entry(cursor, entry)) {
+        char text[VALUE_CAP];
+
+        if (::snprintf(text, sizeof(text), "%u\n", entry.value) > 0) {
+            (void)clux::node::put(entry.node, text);
+        }
+    }
+}
+
+bool stamp(int fd, const char *boot) noexcept
+{
+    const int len = ::snprintf(ledger.text, sizeof(ledger.text), "%d\n%s\n",
+                               static_cast<int>(::getpid()), boot);
+    if (len <= 0 || static_cast<size_t>(len) >= sizeof(ledger.text)) {
+        return false;
+    }
+
+    ledger.used = static_cast<size_t>(len);
+    return ::pwrite(fd, ledger.text, ledger.used, 0) == len;
 }
 
 int32_t claim(const char *path, int extra) noexcept
@@ -80,7 +199,7 @@ int32_t claim(const char *path, int extra) noexcept
         return clux::fail();
     }
 
-    if (!trusted(st)) {
+    if (!clux::trusted(st)) {
         return -EPERM;
     }
 
@@ -88,16 +207,20 @@ int32_t claim(const char *path, int extra) noexcept
         return clux::fail();
     }
 
-    if (::ftruncate(fd.get(), 0) != 0) {
+    char boot[BOOT_CAP] = {};
+    char old[LEDGER_CAP] = {};
+    const bool known_boot = boot_id(boot);
+    const ssize_t got = ::pread(fd.get(), old, sizeof(old) - 1, 0);
+
+    if (known_boot && got > 0) {
+        recover(old, boot);
+    }
+
+    if (::ftruncate(fd.get(), 0) != 0 || !stamp(fd.get(), known_boot ? boot : BOOT_UNKNOWN)) {
         return clux::fail();
     }
 
-    char text[PID_CAP];
-    const int len = ::snprintf(text, sizeof(text), "%d\n", static_cast<int>(::getpid()));
-    if (len <= 0 || ::pwrite(fd.get(), text, static_cast<size_t>(len), 0) != len) {
-        return clux::fail();
-    }
-
+    ledger.fd = fd.get();
     return fd.release();
 }
 
@@ -175,6 +298,48 @@ CLUX_API int32_t clux_proc_lock(const char *path)
     }
 
     return claim(path, O_EXCL);
+}
+
+CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin)
+{
+    const size_t len = node == nullptr ? 0 : ::strnlen(node, NODE_CAP);
+    if (len == 0 || len >= NODE_CAP || ::strchr(node, '\n') != nullptr || ledger.fd < 0) {
+        return -EINVAL;
+    }
+
+    if (known(node, len)) {
+        return 0;
+    }
+
+    char line[NODE_CAP + VALUE_CAP];
+    const int size = ::snprintf(line, sizeof(line), "%u %s\n", origin, node);
+    if (size <= 0) {
+        return -EINVAL;
+    }
+
+    const auto add = static_cast<size_t>(size);
+    if (ledger.used + add >= sizeof(ledger.text)) {
+        return -ENOSPC;
+    }
+
+    if (::pwrite(ledger.fd, line, add, static_cast<off_t>(ledger.used)) != size) {
+        return clux::fail();
+    }
+
+    ::memcpy(ledger.text + ledger.used, line, add);
+    ledger.used += add;
+    ledger.text[ledger.used] = '\0';
+    return 0;
+}
+
+CLUX_API void clux_proc_settle(void)
+{
+    if (ledger.fd >= 0) {
+        (void)::ftruncate(ledger.fd, 0);
+        ledger.fd = -1;
+        ledger.used = 0;
+        ledger.text[0] = '\0';
+    }
 }
 
 CLUX_API int32_t clux_proc_shield(void)

@@ -15,7 +15,8 @@ pub use node::{Fd, Mode, arm, debugfs, devno, open, scan, slurp};
 #[cfg_attr(test, allow(unused_imports))]
 pub use proc::abort;
 pub use proc::{
-    clamp, cores, detach, ioprio, limit, lock, lockmem, pin, realtime, root, shield, slack,
+    clamp, cores, detach, ioprio, journal, limit, lock, lockmem, pin, realtime, root, settle,
+    shield, slack,
 };
 
 use fault::check;

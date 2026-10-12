@@ -8,6 +8,8 @@
 CLUX_API int32_t clux_proc_root(void);
 CLUX_API int32_t clux_proc_detach(void);
 CLUX_API int32_t clux_proc_lock(const char *path);
+CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin);
+CLUX_API void clux_proc_settle(void);
 CLUX_API int32_t clux_proc_shield(void);
 CLUX_API int32_t clux_proc_limit(void);
 CLUX_API int32_t clux_proc_cores(void);
