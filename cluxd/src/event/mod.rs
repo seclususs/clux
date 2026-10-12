@@ -8,6 +8,7 @@ use crate::abi::{self, Epoll, FAULT, Fd, Outcome, READ, Ready};
 pub const SIGNAL: u64 = 0;
 pub const SCHED: u64 = 1;
 pub const BLOCK: u64 = 2;
+pub const QUIET: u64 = 3;
 
 const BATCH: usize = 8;
 

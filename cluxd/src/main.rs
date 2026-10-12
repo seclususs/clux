@@ -14,6 +14,7 @@ mod event;
 mod log;
 mod power;
 mod psi;
+mod quiet;
 mod sched;
 mod sysfs;
 

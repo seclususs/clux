@@ -88,6 +88,14 @@ impl Knob {
         self.origin
     }
 
+    pub fn level(&self) -> Option<u32> {
+        self.node.as_ref().and_then(Self::probe)
+    }
+
+    pub fn force(&mut self, value: u32) -> bool {
+        !self.muted && self.write(value)
+    }
+
     pub fn set(&mut self, value: u32) {
         if self.muted || self.last.or(self.origin) == Some(value) {
             return;
