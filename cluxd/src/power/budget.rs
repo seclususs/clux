@@ -83,18 +83,19 @@ impl Budget {
         self.level = renew(self.level, reading.level, now_us);
 
         let heat = fresh(self.heat, now_us, HEAT_TTL_US);
-        let input = fresh(self.cpu, now_us, CPU_TTL_US).map_or(0, |cpu| {
+        let base = fresh(self.cpu, now_us, CPU_TTL_US).map_or(0, |cpu| {
             let margin = heat.map_or(0, |heat| {
                 heat.saturating_sub(MARGIN_START).clamp(0, MARGIN_SPAN)
             });
 
-            let input = u32::try_from(cpu.saturating_add(margin).max(0)).unwrap_or(0);
-            if heat.is_some_and(|heat| heat >= BATTERY_LIMIT) {
-                input.max(CRITICAL_INPUT)
-            } else {
-                input
-            }
+            u32::try_from(cpu.saturating_add(margin).max(0)).unwrap_or(0)
         });
+
+        let input = if heat.is_some_and(|heat| heat >= BATTERY_LIMIT) {
+            base.max(CRITICAL_INPUT)
+        } else {
+            base
+        };
 
         let _ = self.thermal.step(input, now_us);
 
@@ -169,6 +170,50 @@ mod tests {
     fn battery_hard_limit_forces_critical() {
         let mut budget = Budget::new();
         budget.feed(reading(300, 410, 90), 0);
+        assert_eq!(budget.verdict().scale, 150);
+    }
+
+    #[test]
+    fn battery_hard_limit_applies_without_a_cpu_sensor() {
+        let mut budget = Budget::new();
+        budget.feed(
+            Reading {
+                cpu: None,
+                battery: Some(410),
+                level: Some(90),
+            },
+            0,
+        );
+        assert_eq!(budget.verdict().scale, 150);
+    }
+
+    #[test]
+    fn battery_below_the_limit_without_a_cpu_sensor_keeps_full_budget() {
+        let mut budget = Budget::new();
+        budget.feed(
+            Reading {
+                cpu: None,
+                battery: Some(404),
+                level: Some(90),
+            },
+            0,
+        );
+        assert_eq!(budget.verdict().scale, 1000);
+    }
+
+    #[test]
+    fn an_expired_cpu_reading_does_not_hide_a_hot_battery() {
+        let mut budget = Budget::new();
+        budget.feed(reading(300, 300, 90), 0);
+        assert_eq!(budget.verdict().scale, 1000);
+        budget.feed(
+            Reading {
+                cpu: None,
+                battery: Some(410),
+                level: Some(90),
+            },
+            100 * S,
+        );
         assert_eq!(budget.verdict().scale, 150);
     }
 
