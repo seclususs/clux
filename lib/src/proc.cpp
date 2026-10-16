@@ -3,10 +3,13 @@
 
 #include "proc.hpp"
 
+#include "log.hpp"
 #include "node.hpp"
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +35,9 @@ constexpr const char *BOOT_NODE = "/proc/sys/kernel/random/boot_id";
 constexpr const char *BOOT_UNKNOWN = "-";
 constexpr const char *OOM_NODE = "/proc/self/oom_score_adj";
 constexpr const char *OOM_SHIELD = "-1000\n";
+constexpr const char *DEBUGFS_ROOT = "/sys/kernel/debug/";
+constexpr const char *SENTINEL_NAME = "clux-sentinel";
+constexpr uint32_t LOG_ERROR = 6;
 constexpr rlim_t LIMIT_NOFILE = 64;
 constexpr rlim_t LIMIT_STACK = 262144;
 constexpr rlim_t LIMIT_RTTIME_US = 50000;
@@ -153,25 +159,78 @@ bool boot_id(char (&out)[BOOT_CAP]) noexcept
     return len > 0;
 }
 
-void recover(const char *old, const char *boot) noexcept
+uint32_t recover(const char *old, const char *boot) noexcept
 {
     const char *cursor = skip_line(old);
     const size_t len = ::strlen(boot);
+    uint32_t restored = 0;
 
     if (cursor == nullptr || ::strncmp(cursor, boot, len) != 0 || cursor[len] != '\n') {
-        return;
+        return restored;
     }
 
     cursor += len + 1;
+
+    if (::strstr(cursor, DEBUGFS_ROOT) != nullptr) {
+        (void)clux_node_debugfs();
+    }
+
     Entry entry{};
 
     while (*cursor != '\0' && parse_entry(cursor, entry)) {
         char text[VALUE_CAP];
 
-        if (::snprintf(text, sizeof(text), "%u\n", entry.value) > 0) {
-            (void)clux::node::put(entry.node, text);
+        if (::snprintf(text, sizeof(text), "%u\n", entry.value) > 0 &&
+            clux::node::put(entry.node, text) == 0) {
+            ++restored;
         }
     }
+
+    return restored;
+}
+
+void announce(uint32_t restored) noexcept
+{
+    if (restored > 0) {
+        clux_log_num(LOG_ERROR, "knobs restored after an unclean exit",
+                     static_cast<int64_t>(restored));
+    }
+}
+
+void reclaim() noexcept
+{
+    char boot[BOOT_CAP] = {};
+    char old[LEDGER_CAP] = {};
+    const ssize_t got = ::pread(ledger.fd, old, sizeof(old) - 1, 0);
+
+    if (got > 0 && boot_id(boot)) {
+        announce(recover(old, boot));
+    }
+
+    (void)::ftruncate(ledger.fd, 0);
+}
+
+[[noreturn]] void stand_guard(int watch) noexcept
+{
+    sigset_t blocked;
+    (void)::sigfillset(&blocked);
+    (void)::pthread_sigmask(SIG_SETMASK, &blocked, nullptr);
+    (void)::prctl(PR_SET_NAME, reinterpret_cast<unsigned long>(SENTINEL_NAME));
+
+    char byte = 0;
+    for (;;) {
+        const ssize_t got = ::read(watch, &byte, sizeof(byte));
+        if (got == 0) {
+            break;
+        }
+
+        if (got < 0 && errno != EINTR) {
+            ::_exit(1);
+        }
+    }
+
+    reclaim();
+    ::_exit(0);
 }
 
 bool stamp(int fd, const char *boot) noexcept
@@ -213,7 +272,7 @@ int32_t claim(const char *path, int extra) noexcept
     const ssize_t got = ::pread(fd.get(), old, sizeof(old) - 1, 0);
 
     if (known_boot && got > 0) {
-        recover(old, boot);
+        announce(recover(old, boot));
     }
 
     if (::ftruncate(fd.get(), 0) != 0 || !stamp(fd.get(), known_boot ? boot : BOOT_UNKNOWN)) {
@@ -329,6 +388,34 @@ CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin)
     ::memcpy(ledger.text + ledger.used, line, add);
     ledger.used += add;
     ledger.text[ledger.used] = '\0';
+    return 0;
+}
+
+CLUX_API int32_t clux_proc_sentinel(void)
+{
+    if (ledger.fd < 0) {
+        return -EINVAL;
+    }
+
+    int ends[2] = {-1, -1};
+    if (::pipe2(ends, O_CLOEXEC) != 0) {
+        return clux::fail();
+    }
+
+    const pid_t pid = ::fork();
+    if (pid < 0) {
+        const int32_t err = clux::fail();
+        (void)::close(ends[0]);
+        (void)::close(ends[1]);
+        return err;
+    }
+
+    if (pid == 0) {
+        (void)::close(ends[1]);
+        stand_guard(ends[0]);
+    }
+
+    (void)::close(ends[0]);
     return 0;
 }
 

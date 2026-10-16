@@ -28,6 +28,10 @@ pub fn journal(node: &CStr, origin: u32) -> Outcome<()> {
     unit(unsafe { raw::clux_proc_journal(node.as_ptr(), origin) })
 }
 
+pub fn sentinel() -> Outcome<()> {
+    unit(raw::clux_proc_sentinel())
+}
+
 pub fn settle() {
     raw::clux_proc_settle();
 }

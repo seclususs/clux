@@ -28,6 +28,7 @@ pub fn harden() {
     if let Some(mask) = probe::cores() {
         report(abi::pin(mask), c"cpu affinity failed");
     }
+    report(abi::sentinel(), c"sentinel failed");
     report(abi::ioprio(), c"io priority failed");
     report(abi::clamp(UTIL_MAX), c"utilization clamp failed");
     if abi::realtime(PRIORITY).is_err() {

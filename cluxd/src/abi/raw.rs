@@ -53,6 +53,7 @@ unsafe extern "C" {
     pub(super) safe fn clux_proc_detach() -> i32;
     pub(super) fn clux_proc_lock(path: *const c_char) -> i32;
     pub(super) fn clux_proc_journal(node: *const c_char, origin: u32) -> i32;
+    pub(super) safe fn clux_proc_sentinel() -> i32;
     pub(super) safe fn clux_proc_settle();
     pub(super) safe fn clux_proc_shield() -> i32;
     pub(super) safe fn clux_proc_limit() -> i32;
