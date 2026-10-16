@@ -3,9 +3,10 @@
 
 use core::ffi::CStr;
 
-use super::policy::{Input, Plan, Policy};
+use super::policy::{FULL_SHARE, Input, Plan, Policy};
 use super::stat::{self, Counters, Metrics};
 use crate::abi::{self, Fault, Fd, Mode, Outcome};
+use crate::automata::dwell::Dwell;
 use crate::automata::fixed::scaled;
 use crate::event::slot::{Cause, Unit};
 use crate::psi::Bus;
@@ -21,6 +22,8 @@ const TRIGGER: Trigger = Trigger {
 const STALE_SLACK_US: u64 = 1_000_000;
 const STAT_CAP: usize = 256;
 const MIN_DEPTH: u32 = 4;
+const DEPTH_SETTLE_US: u64 = 4_000_000;
+const DEPTH_GAP_US: u64 = 10_000_000;
 
 #[derive(Debug)]
 pub struct Governor {
@@ -29,6 +32,7 @@ pub struct Governor {
     last: Option<Counters>,
     read_ahead: Knob,
     depth: Knob,
+    dwell: Dwell,
     policy: Policy,
 }
 
@@ -43,10 +47,12 @@ impl Governor {
         buf.get(..got).and_then(stat::parse).ok_or(Fault::Parse)
     }
 
-    fn apply(&mut self, plan: Plan) {
+    fn apply(&mut self, plan: Plan, now_us: u64) {
         self.read_ahead.set(plan.read_ahead);
-        if let Some(origin) = self.depth.origin() {
-            self.depth.set(depth_for(origin, plan.share));
+
+        let share = self.dwell.admit(plan.share, now_us);
+        if let (Some(origin), Some(share)) = (self.depth.origin(), share) {
+            self.depth.set(depth_for(origin, share));
         }
     }
 }
@@ -79,6 +85,7 @@ impl Unit for Governor {
             last: None,
             read_ahead,
             depth,
+            dwell: Dwell::new(FULL_SHARE, DEPTH_SETTLE_US, DEPTH_GAP_US),
             policy: Policy::new(),
         })
     }
@@ -114,7 +121,7 @@ impl Unit for Governor {
             cause == Cause::Trigger,
         );
 
-        self.apply(decision.plan);
+        self.apply(decision.plan, now_us);
         Ok(now_us.saturating_add(decision.next_us))
     }
 

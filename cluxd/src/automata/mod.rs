@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 pub mod cadence;
+pub mod dwell;
 pub mod envelope;
 pub mod fixed;
 pub mod ladder;
