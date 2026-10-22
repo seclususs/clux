@@ -115,7 +115,7 @@ int32_t put(const char *path, const char *text) noexcept
 
 }
 
-CLUX_API int32_t clux_node_open(const char *path, uint32_t mode)
+CLUX_API int32_t clux_node_open(const char *path, uint32_t mode) noexcept
 {
     const int access = clux::node::access_flags(mode);
     if (path == nullptr || access < 0) {
@@ -135,7 +135,7 @@ CLUX_API int32_t clux_node_open(const char *path, uint32_t mode)
     return fd.release();
 }
 
-CLUX_API int32_t clux_node_read(int32_t fd, void *buf, size_t cap)
+CLUX_API int32_t clux_node_read(int32_t fd, void *buf, size_t cap) noexcept
 {
     if (fd < 0 || buf == nullptr || cap > clux::IO_LIMIT) {
         return -EINVAL;
@@ -145,7 +145,7 @@ CLUX_API int32_t clux_node_read(int32_t fd, void *buf, size_t cap)
     return got < 0 ? clux::fail() : static_cast<int32_t>(got);
 }
 
-CLUX_API int32_t clux_node_write(int32_t fd, const void *buf, size_t len)
+CLUX_API int32_t clux_node_write(int32_t fd, const void *buf, size_t len) noexcept
 {
     if (fd < 0 || buf == nullptr || len > clux::IO_LIMIT) {
         return -EINVAL;
@@ -155,14 +155,14 @@ CLUX_API int32_t clux_node_write(int32_t fd, const void *buf, size_t len)
     return done < 0 ? clux::fail() : static_cast<int32_t>(done);
 }
 
-CLUX_API void clux_node_close(int32_t fd)
+CLUX_API void clux_node_close(int32_t fd) noexcept
 {
     if (fd >= 0) {
         (void)::close(fd);
     }
 }
 
-CLUX_API int32_t clux_node_slurp(const char *path, void *buf, size_t cap)
+CLUX_API int32_t clux_node_slurp(const char *path, void *buf, size_t cap) noexcept
 {
     const int32_t fd = clux_node_open(path, clux::node::MODE_READ);
     if (fd < 0) {
@@ -174,7 +174,7 @@ CLUX_API int32_t clux_node_slurp(const char *path, void *buf, size_t cap)
     return got;
 }
 
-CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap)
+CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap) noexcept
 {
     if (dir == nullptr || buf == nullptr || cap == 0 || cap > clux::IO_LIMIT) {
         return -EINVAL;
@@ -216,7 +216,8 @@ CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap)
     }
 }
 
-CLUX_API int32_t clux_node_devno(const char *path, uint32_t *major_out, uint32_t *minor_out)
+CLUX_API int32_t clux_node_devno(const char *path, uint32_t *major_out,
+                                 uint32_t *minor_out) noexcept
 {
     if (path == nullptr || major_out == nullptr || minor_out == nullptr) {
         return -EINVAL;
@@ -237,7 +238,7 @@ CLUX_API int32_t clux_node_devno(const char *path, uint32_t *major_out, uint32_t
     return 0;
 }
 
-CLUX_API int32_t clux_node_debugfs(void)
+CLUX_API int32_t clux_node_debugfs(void) noexcept
 {
     if (::unshare(CLONE_NEWNS) != 0) {
         return clux::fail();

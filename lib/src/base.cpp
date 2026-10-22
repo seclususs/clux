@@ -3,7 +3,7 @@
 
 #include "base.hpp"
 
-CLUX_API uint32_t clux_abi(void)
+CLUX_API uint32_t clux_abi(void) noexcept
 {
     return clux::ABI_VERSION;
 }

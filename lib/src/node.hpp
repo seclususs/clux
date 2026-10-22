@@ -25,11 +25,12 @@ struct Packer {
 
 }
 
-CLUX_API int32_t clux_node_open(const char *path, uint32_t mode);
-CLUX_API int32_t clux_node_read(int32_t fd, void *buf, size_t cap);
-CLUX_API int32_t clux_node_write(int32_t fd, const void *buf, size_t len);
-CLUX_API void clux_node_close(int32_t fd);
-CLUX_API int32_t clux_node_slurp(const char *path, void *buf, size_t cap);
-CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap);
-CLUX_API int32_t clux_node_debugfs(void);
-CLUX_API int32_t clux_node_devno(const char *path, uint32_t *major_out, uint32_t *minor_out);
+CLUX_API int32_t clux_node_open(const char *path, uint32_t mode) noexcept;
+CLUX_API int32_t clux_node_read(int32_t fd, void *buf, size_t cap) noexcept;
+CLUX_API int32_t clux_node_write(int32_t fd, const void *buf, size_t len) noexcept;
+CLUX_API void clux_node_close(int32_t fd) noexcept;
+CLUX_API int32_t clux_node_slurp(const char *path, void *buf, size_t cap) noexcept;
+CLUX_API int32_t clux_node_scan(const char *dir, void *buf, size_t cap) noexcept;
+CLUX_API int32_t clux_node_debugfs(void) noexcept;
+CLUX_API int32_t clux_node_devno(const char *path, uint32_t *major_out,
+                                 uint32_t *minor_out) noexcept;

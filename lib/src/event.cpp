@@ -53,13 +53,13 @@ uint32_t from_epoll(uint32_t raw) noexcept
 
 }
 
-CLUX_API int32_t clux_epoll_open(void)
+CLUX_API int32_t clux_epoll_open(void) noexcept
 {
     const int fd = ::epoll_create1(EPOLL_CLOEXEC);
     return fd < 0 ? clux::fail() : fd;
 }
 
-CLUX_API int32_t clux_epoll_add(int32_t ep, int32_t fd, uint64_t token, uint32_t flags)
+CLUX_API int32_t clux_epoll_add(int32_t ep, int32_t fd, uint64_t token, uint32_t flags) noexcept
 {
     epoll_event ev{};
     ev.events = to_epoll(flags);
@@ -67,13 +67,13 @@ CLUX_API int32_t clux_epoll_add(int32_t ep, int32_t fd, uint64_t token, uint32_t
     return ::epoll_ctl(ep, EPOLL_CTL_ADD, fd, &ev) == 0 ? 0 : clux::fail();
 }
 
-CLUX_API int32_t clux_epoll_del(int32_t ep, int32_t fd)
+CLUX_API int32_t clux_epoll_del(int32_t ep, int32_t fd) noexcept
 {
     return ::epoll_ctl(ep, EPOLL_CTL_DEL, fd, nullptr) == 0 ? 0 : clux::fail();
 }
 
 CLUX_API int32_t clux_epoll_wait(int32_t ep, clux::event::Ready *out, uint32_t cap,
-                                 int32_t timeout_ms)
+                                 int32_t timeout_ms) noexcept
 {
     if (out == nullptr || cap == 0) {
         return -EINVAL;
@@ -94,7 +94,7 @@ CLUX_API int32_t clux_epoll_wait(int32_t ep, clux::event::Ready *out, uint32_t c
     return got;
 }
 
-CLUX_API int32_t clux_signal_open(void)
+CLUX_API int32_t clux_signal_open(void) noexcept
 {
     sigset_t set;
 
@@ -112,7 +112,7 @@ CLUX_API int32_t clux_signal_open(void)
     return fd < 0 ? clux::fail() : fd;
 }
 
-CLUX_API int32_t clux_signal_drain(int32_t fd)
+CLUX_API int32_t clux_signal_drain(int32_t fd) noexcept
 {
     signalfd_siginfo info[SIGNAL_BATCH];
     int32_t total = 0;
@@ -142,7 +142,7 @@ CLUX_API int32_t clux_signal_drain(int32_t fd)
     return total;
 }
 
-CLUX_API uint64_t clux_clock_us(void)
+CLUX_API uint64_t clux_clock_us(void) noexcept
 {
     timespec ts{};
 

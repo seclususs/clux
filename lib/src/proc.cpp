@@ -305,12 +305,12 @@ bool redirect_stdio() noexcept
 
 }
 
-CLUX_API int32_t clux_proc_root(void)
+CLUX_API int32_t clux_proc_root(void) noexcept
 {
     return ::geteuid() == 0 ? 0 : -EPERM;
 }
 
-CLUX_API int32_t clux_proc_detach(void)
+CLUX_API int32_t clux_proc_detach(void) noexcept
 {
     pid_t pid = ::fork();
     if (pid < 0) {
@@ -341,7 +341,7 @@ CLUX_API int32_t clux_proc_detach(void)
     return 0;
 }
 
-CLUX_API int32_t clux_proc_lock(const char *path)
+CLUX_API int32_t clux_proc_lock(const char *path) noexcept
 {
     if (path == nullptr) {
         return -EINVAL;
@@ -359,7 +359,7 @@ CLUX_API int32_t clux_proc_lock(const char *path)
     return claim(path, O_EXCL);
 }
 
-CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin)
+CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin) noexcept
 {
     const size_t len = node == nullptr ? 0 : ::strnlen(node, NODE_CAP);
     if (len == 0 || len >= NODE_CAP || ::strchr(node, '\n') != nullptr || ledger.fd < 0) {
@@ -391,7 +391,7 @@ CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin)
     return 0;
 }
 
-CLUX_API int32_t clux_proc_sentinel(void)
+CLUX_API int32_t clux_proc_sentinel(void) noexcept
 {
     if (ledger.fd < 0) {
         return -EINVAL;
@@ -419,7 +419,7 @@ CLUX_API int32_t clux_proc_sentinel(void)
     return 0;
 }
 
-CLUX_API void clux_proc_settle(void)
+CLUX_API void clux_proc_settle(void) noexcept
 {
     if (ledger.fd >= 0) {
         (void)::ftruncate(ledger.fd, 0);
@@ -429,12 +429,12 @@ CLUX_API void clux_proc_settle(void)
     }
 }
 
-CLUX_API int32_t clux_proc_shield(void)
+CLUX_API int32_t clux_proc_shield(void) noexcept
 {
     return clux::node::put(OOM_NODE, OOM_SHIELD);
 }
 
-CLUX_API int32_t clux_proc_limit(void)
+CLUX_API int32_t clux_proc_limit(void) noexcept
 {
     static constexpr Limit LIMITS[] = {
         {.resource = RLIMIT_CORE, .cap = 0},
@@ -455,13 +455,13 @@ CLUX_API int32_t clux_proc_limit(void)
     return first;
 }
 
-CLUX_API int32_t clux_proc_cores(void)
+CLUX_API int32_t clux_proc_cores(void) noexcept
 {
     const long count = ::sysconf(_SC_NPROCESSORS_CONF);
     return count < 1 ? -EINVAL : static_cast<int32_t>(count);
 }
 
-CLUX_API int32_t clux_proc_pin(uint64_t mask)
+CLUX_API int32_t clux_proc_pin(uint64_t mask) noexcept
 {
     cpu_set_t set;
     CPU_ZERO(&set);
@@ -475,7 +475,7 @@ CLUX_API int32_t clux_proc_pin(uint64_t mask)
     return ::sched_setaffinity(0, sizeof(set), &set) == 0 ? 0 : clux::fail();
 }
 
-CLUX_API int32_t clux_proc_realtime(uint32_t priority)
+CLUX_API int32_t clux_proc_realtime(uint32_t priority) noexcept
 {
     sched_param param{};
     param.sched_priority = static_cast<int>(priority);
@@ -483,7 +483,7 @@ CLUX_API int32_t clux_proc_realtime(uint32_t priority)
     return ::sched_setscheduler(0, policy, &param) == 0 ? 0 : clux::fail();
 }
 
-CLUX_API int32_t clux_proc_clamp(uint32_t util_max)
+CLUX_API int32_t clux_proc_clamp(uint32_t util_max) noexcept
 {
     Attr attr{};
     attr.size = sizeof(Attr);
@@ -493,19 +493,19 @@ CLUX_API int32_t clux_proc_clamp(uint32_t util_max)
     return ::syscall(SYS_sched_setattr, 0L, &attr, 0UL) == 0 ? 0 : clux::fail();
 }
 
-CLUX_API int32_t clux_proc_ioprio(void)
+CLUX_API int32_t clux_proc_ioprio(void) noexcept
 {
     const long value = IOPRIO_CLASS_BEST_EFFORT << IOPRIO_CLASS_SHIFT;
     return ::syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0L, value) == 0 ? 0 : clux::fail();
 }
 
-CLUX_API int32_t clux_proc_slack(uint64_t nanos)
+CLUX_API int32_t clux_proc_slack(uint64_t nanos) noexcept
 {
     const int done = ::prctl(PR_SET_TIMERSLACK, static_cast<unsigned long>(nanos), 0UL, 0UL, 0UL);
     return done == 0 ? 0 : clux::fail();
 }
 
-CLUX_API int32_t clux_proc_lockmem(void)
+CLUX_API int32_t clux_proc_lockmem(void) noexcept
 {
     if (::mlockall(MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT) == 0) {
         return 0;
@@ -518,7 +518,7 @@ CLUX_API int32_t clux_proc_lockmem(void)
     return ::mlockall(MCL_CURRENT | MCL_FUTURE) == 0 ? 0 : clux::fail();
 }
 
-CLUX_API __attribute__((noreturn)) void clux_proc_abort(void)
+CLUX_API __attribute__((noreturn)) void clux_proc_abort(void) noexcept
 {
     ::abort();
 }

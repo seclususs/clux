@@ -204,7 +204,7 @@ void emit(uint32_t level, const char *text) noexcept
 
 }
 
-CLUX_API int32_t clux_log_open(const char *path, uint32_t cap)
+CLUX_API int32_t clux_log_open(const char *path, uint32_t cap) noexcept
 {
     const size_t len = path == nullptr ? 0 : ::strnlen(path, PATH_CAP);
     if (len == 0 || len >= PATH_CAP || cap < SINK_MIN || cap > SINK_MAX) {
@@ -229,14 +229,14 @@ CLUX_API int32_t clux_log_open(const char *path, uint32_t cap)
     return 0;
 }
 
-CLUX_API void clux_log(uint32_t level, const char *msg)
+CLUX_API void clux_log(uint32_t level, const char *msg) noexcept
 {
     if (msg != nullptr) {
         emit(level, msg);
     }
 }
 
-CLUX_API void clux_log_num(uint32_t level, const char *msg, int64_t value)
+CLUX_API void clux_log_num(uint32_t level, const char *msg, int64_t value) noexcept
 {
     if (msg == nullptr) {
         return;

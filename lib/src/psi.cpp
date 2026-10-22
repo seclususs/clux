@@ -17,7 +17,7 @@ constexpr size_t TRIGGER_CAP = 32;
 
 }
 
-CLUX_API int32_t clux_psi_arm(const char *path, uint32_t threshold_us, uint32_t window_us)
+CLUX_API int32_t clux_psi_arm(const char *path, uint32_t threshold_us, uint32_t window_us) noexcept
 {
     using namespace clux::psi;
 

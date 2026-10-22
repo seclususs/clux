@@ -71,4 +71,4 @@ template <typename Op>
 
 }
 
-CLUX_API uint32_t clux_abi(void);
+CLUX_API uint32_t clux_abi(void) noexcept;

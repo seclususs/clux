@@ -35,7 +35,7 @@ void collect(void *cookie, [[maybe_unused]] const char *name, const char *value,
 
 }
 
-CLUX_API int32_t clux_prop_get(const char *key, char *out, size_t cap)
+CLUX_API int32_t clux_prop_get(const char *key, char *out, size_t cap) noexcept
 {
     if (key == nullptr || out == nullptr || cap == 0) {
         return -EINVAL;
@@ -55,7 +55,7 @@ CLUX_API int32_t clux_prop_get(const char *key, char *out, size_t cap)
 
 #else
 
-CLUX_API int32_t clux_prop_get(const char *key, char *out, size_t cap)
+CLUX_API int32_t clux_prop_get(const char *key, char *out, size_t cap) noexcept
 {
     if (key == nullptr || out == nullptr || cap < 2) {
         return -EINVAL;
