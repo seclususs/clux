@@ -238,16 +238,27 @@ void reclaim() noexcept
     ::_exit(0);
 }
 
-bool stamp(int fd, const char *boot) noexcept
+int32_t record(int fd, const char *text, size_t len, size_t at) noexcept
+{
+    const ssize_t done = ::pwrite(fd, text, len, static_cast<off_t>(at));
+    if (done < 0) {
+        return clux::fail();
+    }
+
+    const auto written = static_cast<size_t>(done);
+    return written == len ? 0 : -EIO;
+}
+
+int32_t stamp(int fd, const char *boot) noexcept
 {
     const int len = ::snprintf(ledger.text, sizeof(ledger.text), "%d\n%s\n",
                                static_cast<int>(::getpid()), boot);
     if (len <= 0 || static_cast<size_t>(len) >= sizeof(ledger.text)) {
-        return false;
+        return -EINVAL;
     }
 
     ledger.used = static_cast<size_t>(len);
-    return ::pwrite(fd, ledger.text, ledger.used, 0) == len;
+    return record(fd, ledger.text, ledger.used, 0);
 }
 
 int32_t claim(const char *path, int extra) noexcept
@@ -280,8 +291,13 @@ int32_t claim(const char *path, int extra) noexcept
         announce(recover(old, boot));
     }
 
-    if (::ftruncate(fd.get(), 0) != 0 || !stamp(fd.get(), known_boot ? boot : BOOT_UNKNOWN)) {
+    if (::ftruncate(fd.get(), 0) != 0) {
         return clux::fail();
+    }
+
+    const int32_t stamped = stamp(fd.get(), known_boot ? boot : BOOT_UNKNOWN);
+    if (stamped < 0) {
+        return stamped;
     }
 
     ledger.fd = fd.get();
@@ -407,8 +423,9 @@ CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin) noexcept
         return -ENOSPC;
     }
 
-    if (::pwrite(ledger.fd, line, add, static_cast<off_t>(ledger.used)) != size) {
-        return clux::fail();
+    const int32_t written = record(ledger.fd, line, add, ledger.used);
+    if (written < 0) {
+        return written;
     }
 
     ::memcpy(ledger.text + ledger.used, line, add);
