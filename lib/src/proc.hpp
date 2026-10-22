@@ -7,7 +7,7 @@
 
 CLUX_API int32_t clux_proc_root(void) noexcept;
 CLUX_API int32_t clux_proc_detach(void) noexcept;
-CLUX_API int32_t clux_proc_lock(const char *path) noexcept;
+CLUX_API int32_t clux_proc_lock(const char *path, uint32_t wait_ms) noexcept;
 CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin) noexcept;
 CLUX_API int32_t clux_proc_sentinel(void) noexcept;
 CLUX_API void clux_proc_settle(void) noexcept;

@@ -9,13 +9,14 @@ use crate::sysfs::probe;
 
 const LOCK: &CStr = c"/data/local/tmp/cluxd.lock";
 const LOG: &CStr = c"/data/local/tmp/cluxd.log";
+const LOCK_WAIT_MS: u32 = 3_000;
 const LOG_CAP: u32 = 65_536;
 const PRIORITY: u32 = 1;
 const UTIL_MAX: u32 = 102;
 const SLACK_NS: u64 = 50_000_000;
 
 pub fn claim() -> Outcome<Fd> {
-    abi::lock(LOCK)
+    abi::lock(LOCK, LOCK_WAIT_MS)
 }
 
 pub fn persist() {

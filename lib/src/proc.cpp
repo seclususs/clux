@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <sys/file.h>
 #include <sys/mman.h>
@@ -27,6 +28,10 @@ namespace
 constexpr mode_t LOCK_MODE = 0600;
 constexpr mode_t DAEMON_UMASK = 077;
 constexpr int STD_FDS = 3;
+constexpr uint32_t LOCK_STEP_MS = 20;
+constexpr uint32_t LOCK_WAIT_MAX_MS = 10000;
+constexpr uint32_t MILLIS_PER_SECOND = 1000;
+constexpr long NANOS_PER_MILLI = 1000000;
 constexpr size_t LEDGER_CAP = 2048;
 constexpr size_t NODE_CAP = 96;
 constexpr size_t BOOT_CAP = 48;
@@ -283,6 +288,29 @@ int32_t claim(const char *path, int extra) noexcept
     return fd.release();
 }
 
+int32_t acquire(const char *path) noexcept
+{
+    const int32_t first = claim(path, 0);
+    if (first != -EPERM && first != -ELOOP) {
+        return first;
+    }
+
+    if (::unlink(path) != 0 && errno != ENOENT) {
+        return clux::fail();
+    }
+
+    return claim(path, O_EXCL);
+}
+
+void nap(uint32_t millis) noexcept
+{
+    timespec span{};
+    span.tv_sec = static_cast<time_t>(millis / MILLIS_PER_SECOND);
+    span.tv_nsec = static_cast<long>(millis % MILLIS_PER_SECOND) * NANOS_PER_MILLI;
+
+    (void)::nanosleep(&span, nullptr);
+}
+
 bool redirect_stdio() noexcept
 {
     clux::Fd null(::open("/dev/null", O_RDWR));
@@ -341,22 +369,20 @@ CLUX_API int32_t clux_proc_detach(void) noexcept
     return 0;
 }
 
-CLUX_API int32_t clux_proc_lock(const char *path) noexcept
+CLUX_API int32_t clux_proc_lock(const char *path, uint32_t wait_ms) noexcept
 {
-    if (path == nullptr) {
+    if (path == nullptr || wait_ms > LOCK_WAIT_MAX_MS) {
         return -EINVAL;
     }
 
-    const int32_t first = claim(path, 0);
-    if (first != -EPERM && first != -ELOOP) {
-        return first;
+    int32_t result = acquire(path);
+
+    for (uint32_t waited = 0; result == -EWOULDBLOCK && waited < wait_ms; waited += LOCK_STEP_MS) {
+        nap(LOCK_STEP_MS);
+        result = acquire(path);
     }
 
-    if (::unlink(path) != 0 && errno != ENOENT) {
-        return clux::fail();
-    }
-
-    return claim(path, O_EXCL);
+    return result;
 }
 
 CLUX_API int32_t clux_proc_journal(const char *node, uint32_t origin) noexcept

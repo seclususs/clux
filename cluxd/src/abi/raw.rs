@@ -51,7 +51,7 @@ unsafe extern "C" {
     pub(super) fn clux_log_num(level: u32, msg: *const c_char, value: i64);
     pub(super) safe fn clux_proc_root() -> i32;
     pub(super) safe fn clux_proc_detach() -> i32;
-    pub(super) fn clux_proc_lock(path: *const c_char) -> i32;
+    pub(super) fn clux_proc_lock(path: *const c_char, wait_ms: u32) -> i32;
     pub(super) fn clux_proc_journal(node: *const c_char, origin: u32) -> i32;
     pub(super) safe fn clux_proc_sentinel() -> i32;
     pub(super) safe fn clux_proc_settle();

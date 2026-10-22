@@ -19,8 +19,8 @@ pub fn detach() -> Outcome<()> {
     unit(raw::clux_proc_detach())
 }
 
-pub fn lock(path: &CStr) -> Outcome<Fd> {
-    let fd = unsafe { raw::clux_proc_lock(path.as_ptr()) };
+pub fn lock(path: &CStr, wait_ms: u32) -> Outcome<Fd> {
+    let fd = unsafe { raw::clux_proc_lock(path.as_ptr(), wait_ms) };
     check(fd).map(|_| Fd::adopt(fd))
 }
 
