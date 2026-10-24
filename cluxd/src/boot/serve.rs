@@ -13,7 +13,7 @@ use crate::sched;
 
 const MAX_WAIT_MS: i32 = 60_000;
 
-fn timeout(now_us: u64, due: [Option<u64>; 3]) -> i32 {
+fn timeout<const N: usize>(now_us: u64, due: [Option<u64>; N]) -> i32 {
     due.into_iter().flatten().min().map_or(MAX_WAIT_MS, |at| {
         millis(at.saturating_sub(now_us)).min(MAX_WAIT_MS)
     })
