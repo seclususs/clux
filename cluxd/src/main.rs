@@ -17,6 +17,7 @@ mod psi;
 mod quiet;
 mod sched;
 mod sysfs;
+mod vm;
 
 #[cfg(not(test))]
 #[panic_handler]

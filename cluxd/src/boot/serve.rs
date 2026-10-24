@@ -10,6 +10,7 @@ use crate::log;
 use crate::psi::Bus;
 use crate::quiet;
 use crate::sched;
+use crate::vm;
 
 const MAX_WAIT_MS: i32 = 60_000;
 
@@ -18,6 +19,7 @@ struct Governors {
     block: Slot<block::Governor>,
     sched: Slot<sched::Governor>,
     quiet: Slot<quiet::Governor>,
+    vm: Slot<vm::Governor>,
 }
 
 impl Governors {
@@ -26,19 +28,21 @@ impl Governors {
             block: Slot::new(event::BLOCK),
             sched: Slot::new(event::SCHED),
             quiet: Slot::new(event::QUIET),
+            vm: Slot::new(event::VM),
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 3] {
+    const fn deadlines(&self) -> [Option<u64>; 4] {
         [
             self.block.deadline(),
             self.sched.deadline(),
             self.quiet.deadline(),
+            self.vm.deadline(),
         ]
     }
 
     const fn dead(&self) -> bool {
-        self.block.dead() && self.sched.dead() && self.quiet.dead()
+        self.block.dead() && self.sched.dead() && self.quiet.dead() && self.vm.dead()
     }
 
     fn dispatch(&mut self, wake: Wake, epoll: &Epoll, now_us: u64, bus: &mut Bus) {
@@ -48,12 +52,14 @@ impl Governors {
         self.block.pump(epoll, now_us, bus, Cause::Timer);
         self.sched.pump(epoll, now_us, bus, Cause::Timer);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
+        self.vm.pump(epoll, now_us, bus, Cause::Timer);
     }
 
     fn retire(&mut self) {
         self.block.retire();
         self.sched.retire();
         self.quiet.retire();
+        self.vm.retire();
     }
 }
 
