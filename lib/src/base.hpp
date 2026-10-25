@@ -30,6 +30,11 @@ constexpr mode_t WRITABLE_BY_OTHERS = 022;
            (st.st_mode & WRITABLE_BY_OTHERS) == 0;
 }
 
+[[nodiscard]] inline bool replaceable(int32_t err) noexcept
+{
+    return err == -EPERM || err == -ELOOP || err == -ENXIO;
+}
+
 class Fd
 {
   public:

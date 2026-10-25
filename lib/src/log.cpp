@@ -117,7 +117,7 @@ size_t format(char *row, size_t cap, const timespec &now, uint32_t level, const 
 
 int32_t claim(const char *path, int extra, size_t &size) noexcept
 {
-    const int flags = O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | extra;
+    const int flags = O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | extra;
     clux::Fd fd(clux::retry([&] { return ::open(path, flags, SINK_MODE); }));
     if (!fd.valid()) {
         return clux::fail();
@@ -139,7 +139,7 @@ int32_t claim(const char *path, int extra, size_t &size) noexcept
 int32_t reopen(const char *path, size_t &size) noexcept
 {
     const int32_t first = claim(path, 0, size);
-    if (first != -EPERM && first != -ELOOP) {
+    if (!clux::replaceable(first)) {
         return first;
     }
 

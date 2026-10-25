@@ -307,7 +307,7 @@ int32_t claim(const char *path, int extra) noexcept
 int32_t acquire(const char *path) noexcept
 {
     const int32_t first = claim(path, 0);
-    if (first != -EPERM && first != -ELOOP) {
+    if (!clux::replaceable(first)) {
         return first;
     }
 
