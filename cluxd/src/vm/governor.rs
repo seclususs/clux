@@ -13,9 +13,11 @@ use crate::sysfs::knob::Knob;
 const SWAPS: &CStr = c"/proc/swaps";
 const PAGE_CLUSTER: &CStr = c"/proc/sys/vm/page-cluster";
 const WATERMARK_BOOST: &CStr = c"/proc/sys/vm/watermark_boost_factor";
+const COMPACTION_PROACTIVENESS: &CStr = c"/proc/sys/vm/compaction_proactiveness";
 const SWAPS_CAP: usize = 512;
 const NO_READAHEAD: u32 = 0;
 const NO_BOOST: u32 = 0;
+const NO_COMPACTION: u32 = 0;
 const PACE_MS: [u32; 3] = [30_000, 120_000, 600_000];
 const PACE_PATIENCE: u32 = 2;
 
@@ -23,6 +25,7 @@ const PACE_PATIENCE: u32 = 2;
 pub struct Governor {
     cluster: Knob,
     boost: Knob,
+    compact: Knob,
     cadence: Cadence<3>,
     verdict: Verdict,
 }
@@ -47,6 +50,16 @@ impl Governor {
             let _ = self.boost.force(NO_BOOST);
         }
     }
+
+    fn enforce_compact(&mut self) {
+        if self
+            .compact
+            .level()
+            .is_some_and(|level| level != NO_COMPACTION)
+        {
+            let _ = self.compact.force(NO_COMPACTION);
+        }
+    }
 }
 
 impl Unit for Governor {
@@ -56,11 +69,13 @@ impl Unit for Governor {
     fn spawn(_now_us: u64) -> Outcome<Self> {
         let cluster = Knob::open(PAGE_CLUSTER);
         let boost = Knob::open(WATERMARK_BOOST);
+        let compact = Knob::open(COMPACTION_PROACTIVENESS);
 
         let cluster_tunable = is_tunable(cluster.origin(), NO_READAHEAD);
         let boost_tunable = is_tunable(boost.origin(), NO_BOOST);
+        let compact_tunable = is_tunable(compact.origin(), NO_COMPACTION);
 
-        if !cluster_tunable && !boost_tunable {
+        if !cluster_tunable && !boost_tunable && !compact_tunable {
             return Err(Fault::Absent);
         }
 
@@ -70,6 +85,7 @@ impl Unit for Governor {
         Ok(Self {
             cluster,
             boost,
+            compact,
             cadence,
             verdict: Verdict::Hold,
         })
@@ -89,12 +105,17 @@ impl Unit for Governor {
             Verdict::Apply => {
                 self.enforce_cluster();
                 self.enforce_boost();
+                self.enforce_compact();
             }
             Verdict::Release => {
                 self.cluster.restore();
                 self.enforce_boost();
+                self.enforce_compact();
             }
-            Verdict::Hold => self.enforce_boost(),
+            Verdict::Hold => {
+                self.enforce_boost();
+                self.enforce_compact();
+            }
         }
 
         if verdict != self.verdict {
@@ -108,6 +129,7 @@ impl Unit for Governor {
     fn retire(&mut self) {
         self.cluster.restore();
         self.boost.restore();
+        self.compact.restore();
     }
 
     fn vacate(_bus: &mut Bus) {}
@@ -121,9 +143,12 @@ mod tests {
     fn tunable_when_origin_differs_from_target() {
         assert!(is_tunable(Some(3), NO_READAHEAD));
         assert!(is_tunable(Some(15000), NO_BOOST));
+        assert!(is_tunable(Some(20), NO_COMPACTION));
         assert!(!is_tunable(Some(0), NO_READAHEAD));
         assert!(!is_tunable(Some(0), NO_BOOST));
+        assert!(!is_tunable(Some(0), NO_COMPACTION));
         assert!(!is_tunable(None, NO_READAHEAD));
         assert!(!is_tunable(None, NO_BOOST));
+        assert!(!is_tunable(None, NO_COMPACTION));
     }
 }
