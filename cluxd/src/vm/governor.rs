@@ -12,24 +12,39 @@ use crate::sysfs::knob::Knob;
 
 const SWAPS: &CStr = c"/proc/swaps";
 const PAGE_CLUSTER: &CStr = c"/proc/sys/vm/page-cluster";
+const WATERMARK_BOOST: &CStr = c"/proc/sys/vm/watermark_boost_factor";
 const SWAPS_CAP: usize = 512;
 const NO_READAHEAD: u32 = 0;
+const NO_BOOST: u32 = 0;
 const PACE_MS: [u32; 3] = [30_000, 120_000, 600_000];
 const PACE_PATIENCE: u32 = 2;
 
 #[derive(Debug)]
 pub struct Governor {
-    knob: Knob,
+    cluster: Knob,
+    boost: Knob,
     cadence: Cadence<3>,
     verdict: Verdict,
 }
 
-impl Governor {
-    fn enforce(&mut self) {
-        let drifted = self.knob.level().is_some_and(|level| level != NO_READAHEAD);
+fn is_tunable(origin: Option<u32>, target: u32) -> bool {
+    origin.is_some_and(|value| value != target)
+}
 
-        if drifted {
-            let _ = self.knob.force(NO_READAHEAD);
+impl Governor {
+    fn enforce_cluster(&mut self) {
+        if self
+            .cluster
+            .level()
+            .is_some_and(|level| level != NO_READAHEAD)
+        {
+            let _ = self.cluster.force(NO_READAHEAD);
+        }
+    }
+
+    fn enforce_boost(&mut self) {
+        if self.boost.level().is_some_and(|level| level != NO_BOOST) {
+            let _ = self.boost.force(NO_BOOST);
         }
     }
 }
@@ -39,8 +54,13 @@ impl Unit for Governor {
     const FAILED: &'static CStr = c"vm governor stopped, fault";
 
     fn spawn(_now_us: u64) -> Outcome<Self> {
-        let knob = Knob::open(PAGE_CLUSTER);
-        if knob.origin().is_none_or(|origin| origin == NO_READAHEAD) {
+        let cluster = Knob::open(PAGE_CLUSTER);
+        let boost = Knob::open(WATERMARK_BOOST);
+
+        let cluster_tunable = is_tunable(cluster.origin(), NO_READAHEAD);
+        let boost_tunable = is_tunable(boost.origin(), NO_BOOST);
+
+        if !cluster_tunable && !boost_tunable {
             return Err(Fault::Absent);
         }
 
@@ -48,7 +68,8 @@ impl Unit for Governor {
         cadence.boost();
 
         Ok(Self {
-            knob,
+            cluster,
+            boost,
             cadence,
             verdict: Verdict::Hold,
         })
@@ -65,9 +86,15 @@ impl Unit for Governor {
         let verdict = judge(text, got < SWAPS_CAP);
 
         match verdict {
-            Verdict::Apply => self.enforce(),
-            Verdict::Release => self.knob.restore(),
-            Verdict::Hold => {}
+            Verdict::Apply => {
+                self.enforce_cluster();
+                self.enforce_boost();
+            }
+            Verdict::Release => {
+                self.cluster.restore();
+                self.enforce_boost();
+            }
+            Verdict::Hold => self.enforce_boost(),
         }
 
         if verdict != self.verdict {
@@ -79,8 +106,24 @@ impl Unit for Governor {
     }
 
     fn retire(&mut self) {
-        self.knob.restore();
+        self.cluster.restore();
+        self.boost.restore();
     }
 
     fn vacate(_bus: &mut Bus) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tunable_when_origin_differs_from_target() {
+        assert!(is_tunable(Some(3), NO_READAHEAD));
+        assert!(is_tunable(Some(15000), NO_BOOST));
+        assert!(!is_tunable(Some(0), NO_READAHEAD));
+        assert!(!is_tunable(Some(0), NO_BOOST));
+        assert!(!is_tunable(None, NO_READAHEAD));
+        assert!(!is_tunable(None, NO_BOOST));
+    }
 }
