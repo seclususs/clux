@@ -27,6 +27,7 @@ const NODES: [&[&CStr]; 6] = [
     &[
         c"/proc/sys/kernel/sched_min_granularity_ns",
         c"/sys/kernel/debug/sched/min_granularity_ns",
+        c"/proc/sys/kernel/sched_base_slice_ns",
         c"/sys/kernel/debug/sched/base_slice_ns",
     ],
     &[
