@@ -1,5 +1,4 @@
 #!/system/bin/sh
+MODDIR=${0%/*}
 
-MODDIR="${0%/*}"
-
-exec "${MODDIR}/system/bin/cluxd"
+"${MODDIR}/system/bin/cluxd" >/dev/null 2>&1 &

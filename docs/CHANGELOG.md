@@ -1,7 +1,1 @@
-# Changelog
-
-## [v3.0]
-
--
--
--
+Base release for cluxd v1.0.0

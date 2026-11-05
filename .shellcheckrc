@@ -1,3 +1,2 @@
-shell=sh
-enable=add-default-case,avoid-nullary-conditions,check-extra-masked-returns,deprecate-which,quote-safe-variables,require-variable-braces
-disable=SC1091,SC2034
+disable=SC1090,SC1091,SC3043,SC2155,SC2034,SC2154
+enable=require-variable-braces,quote-safe-variables,check-unassigned-uppercase

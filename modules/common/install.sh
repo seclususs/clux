@@ -1,38 +1,23 @@
 #!/system/bin/sh
 
-DAEMON_PATH="system/bin/cluxd"
-MIN_API=29
+. "${MODPATH}/common/functions.sh"
 
-print_banner() {
-    version="$(read_prop version "${MODPATH}/module.prop")"
-    ui_print "*************************************"
-    ui_print "  cluxd v${version}"
-    ui_print "*************************************"
-}
+print_header
 
-check_platform() {
-    log_step "[1/3] Verifying system environment..."
-    [ "${ARCH}" = "arm64" ] || log_fail "Unsupported architecture (${ARCH}). cluxd requires arm64."
-    [ "${API}" -ge "${MIN_API}" ] || log_fail "Unsupported Android API (${API}). cluxd requires API ${MIN_API} or newer."
-}
+ui_print "- Checking system requirements..."
+check_cpu_arch
+check_api_compat
+check_kernel_compat
+check_psi_nodes
 
-extract_payload() {
-    log_step "[2/3] Extracting module files..."
-    unpack_files module.prop service.sh system.prop uninstall.sh "${DAEMON_PATH}"
-}
+ui_print "- Extracting binaries..."
+extract_binary
 
-apply_permissions() {
-    log_step "[3/3] Setting file permissions..."
-    set_perm_recursive "${MODPATH}" 0 0 0755 0644
-    set_perm "${MODPATH}/service.sh" 0 0 0755
-    set_perm "${MODPATH}/uninstall.sh" 0 0 0755
-    set_perm "${MODPATH}/${DAEMON_PATH}" 0 0 0755
-}
+ui_print "- Configuring service..."
+extract_services
 
-install_main() {
-    unpack_files module.prop
-    print_banner
-    check_platform
-    extract_payload
-    apply_permissions
-}
+ui_print "- Setting permissions..."
+set_permissions
+
+ui_print "- Cleaning up..."
+cleanup

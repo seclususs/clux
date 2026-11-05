@@ -15,7 +15,7 @@
 namespace clux
 {
 
-constexpr uint32_t ABI_VERSION = 3;
+constexpr uint32_t ABI_VERSION = 100;
 constexpr size_t IO_LIMIT = 65536;
 constexpr mode_t WRITABLE_BY_OTHERS = 022;
 

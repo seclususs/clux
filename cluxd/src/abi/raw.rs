@@ -3,7 +3,7 @@
 
 use core::ffi::{c_char, c_void};
 
-pub const VERSION: u32 = 3;
+pub const VERSION: u32 = 100;
 pub const NODE_READ: u32 = 0;
 pub const NODE_WRITE: u32 = 1;
 pub const NODE_RDWR: u32 = 2;
