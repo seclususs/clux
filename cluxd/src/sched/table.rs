@@ -16,6 +16,7 @@ pub const WALT: [u32; RUNGS] = [10, 14, 22, 30, 40];
 pub const PACE_MS: [u32; PACES] = [100, 250, 500, 1000, 2500, 5000, 10_000];
 pub const PACE_CEILING: [usize; RUNGS] = [6, 4, 2, 1, 0];
 pub const PACE_PATIENCE: u32 = 2;
+pub const DARK_CEILING: usize = 1;
 
 pub const LATENCY_MIN: u32 = 8_000_000;
 pub const LATENCY_SPAN: u32 = 12_000_000;

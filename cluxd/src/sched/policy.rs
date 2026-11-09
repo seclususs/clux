@@ -2,21 +2,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use super::table::{
-    ENTER, GRANULARITY_MAX, GRANULARITY_MIN, GRANULARITY_PERCENT, GRANULARITY_STEP, HOLD_US,
-    IO_FLOOR, IO_HEAVY, LATENCY, LATENCY_MIN, LATENCY_SPAN, LEAVE, MIGRATION, MIGRATION_FLOOR,
-    PACE_CEILING, PACE_MS, PACE_PATIENCE, PACES, RUNGS, VOLATILE_SLOPE, WAKEUP, WALT,
+    DARK_CEILING, ENTER, GRANULARITY_MAX, GRANULARITY_MIN, GRANULARITY_PERCENT, GRANULARITY_STEP,
+    HOLD_US, IO_FLOOR, IO_HEAVY, LATENCY, LATENCY_MIN, LATENCY_SPAN, LEAVE, MIGRATION,
+    MIGRATION_FLOOR, PACE_CEILING, PACE_MS, PACE_PATIENCE, PACES, RUNGS, VOLATILE_SLOPE, WAKEUP,
+    WALT,
 };
 use crate::automata::cadence::Cadence;
 use crate::automata::fixed::{at, floor_to, ratio, scaled};
 use crate::automata::ladder::Ladder;
 use crate::automata::markov::Markov;
 use crate::power::budget::Verdict;
+use crate::psi::Screen;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Input {
     pub cpu: u32,
     pub slope: i32,
     pub io: u32,
+    pub screen: Screen,
     pub verdict: Verdict,
 }
 
@@ -67,7 +70,10 @@ impl Policy {
             self.last = rung;
         }
 
-        let ceiling = input.verdict.ceiling;
+        let ceiling = match input.screen {
+            Screen::On => input.verdict.ceiling,
+            Screen::Off => input.verdict.ceiling.min(DARK_CEILING),
+        };
 
         let ahead = if input.slope > 0 {
             self.markov
@@ -143,6 +149,7 @@ mod tests {
             cpu,
             slope,
             io,
+            screen: Screen::On,
             verdict,
         }
     }
@@ -289,5 +296,56 @@ mod tests {
         let fast = policy.step(input(0, 0, 0, FULL), S, true).next_us;
         assert!(slow >= 5_000_000);
         assert!(fast < slow);
+    }
+
+    #[test]
+    fn a_dark_screen_holds_the_regime_back() {
+        let mut lit = Policy::new();
+        let mut dark = Policy::new();
+        let busy = input(400, 0, 0, FULL);
+        let off = Input {
+            screen: Screen::Off,
+            ..busy
+        };
+        let bright = lit.step(busy, 0, false).plan;
+        let dimmed = dark.step(off, 0, false).plan;
+        assert_eq!(
+            bright.latency,
+            at(&LATENCY, 4),
+            "lit screen reaches the top"
+        );
+        assert_eq!(
+            dimmed.latency,
+            at(&LATENCY, DARK_CEILING),
+            "dark screen stays at the ceiling"
+        );
+    }
+
+    #[test]
+    fn a_dark_screen_cannot_lift_a_lower_ceiling() {
+        let mut policy = Policy::new();
+        let low = Verdict {
+            scale: 1000,
+            ceiling: 0,
+        };
+        let off = Input {
+            screen: Screen::Off,
+            ..input(400, 0, 0, low)
+        };
+        let plan = policy.step(off, 0, false).plan;
+        assert_eq!(plan.latency, at(&LATENCY, 0), "battery ceiling still wins");
+    }
+
+    #[test]
+    fn a_dark_screen_is_polled_more_slowly() {
+        let mut lit = Policy::new();
+        let mut dark = Policy::new();
+        let busy = input(400, 0, 0, FULL);
+        let off = Input {
+            screen: Screen::Off,
+            ..busy
+        };
+        assert_eq!(lit.step(busy, 0, false).next_us, 100_000, "lit and busy");
+        assert_eq!(dark.step(off, 0, false).next_us, 2_500_000, "dark and busy");
     }
 }

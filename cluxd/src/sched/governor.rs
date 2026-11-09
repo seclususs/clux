@@ -197,6 +197,7 @@ impl Unit for Governor {
             cpu: sample.level,
             slope: sample.slope,
             io: bus.io,
+            screen: bus.screen,
             verdict: self.budget.verdict(),
         };
 
