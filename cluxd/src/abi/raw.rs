@@ -10,6 +10,11 @@ pub const NODE_RDWR: u32 = 2;
 pub const FLAG_READ: u32 = 1;
 pub const FLAG_PRIORITY: u32 = 2;
 pub const FLAG_FAULT: u32 = 4;
+pub const INPUT_POINTER: u32 = 1;
+pub const INPUT_DIRECT: u32 = 2;
+pub const INPUT_MULTITOUCH: u32 = 4;
+pub const INPUT_ABSOLUTE: u32 = 8;
+pub const INPUT_CONTACT: u32 = 16;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -43,6 +48,9 @@ unsafe extern "C" {
     pub(super) safe fn clux_epoll_add(ep: i32, fd: i32, token: u64, flags: u32) -> i32;
     pub(super) safe fn clux_epoll_del(ep: i32, fd: i32) -> i32;
     pub(super) fn clux_epoll_wait(ep: i32, out: *mut Ready, cap: u32, timeout_ms: i32) -> i32;
+    pub(super) fn clux_input_open(path: *const c_char) -> i32;
+    pub(super) safe fn clux_input_caps(fd: i32) -> i32;
+    pub(super) safe fn clux_input_drain(fd: i32) -> i32;
     pub(super) safe fn clux_signal_open() -> i32;
     pub(super) safe fn clux_signal_drain(fd: i32) -> i32;
     pub(super) fn clux_prop_get(key: *const c_char, out: *mut c_char, cap: usize) -> i32;

@@ -3,6 +3,7 @@
 
 mod event;
 mod fault;
+mod input;
 mod node;
 mod proc;
 mod raw;
@@ -11,6 +12,10 @@ use core::ffi::CStr;
 
 pub use event::{Epoll, FAULT, PRIORITY, READ, Ready, drain, signals};
 pub use fault::{Fault, Outcome};
+pub use input::{
+    CAP_ABSOLUTE, CAP_CONTACT, CAP_DIRECT, CAP_MULTITOUCH, CAP_POINTER, input_caps, input_drain,
+    input_open,
+};
 pub use node::{Fd, Mode, arm, debugfs, devno, open, scan, slurp};
 #[cfg_attr(test, allow(unused_imports))]
 pub use proc::abort;

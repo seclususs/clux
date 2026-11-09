@@ -20,6 +20,10 @@ impl Epoll {
         check(fd).map(|_| Self(Fd::adopt(fd)))
     }
 
+    pub const fn fd(&self) -> &Fd {
+        &self.0
+    }
+
     pub fn add(&self, fd: &Fd, token: u64, flags: u32) -> Outcome<()> {
         check(raw::clux_epoll_add(self.0.raw(), fd.raw(), token, flags)).map(|_| ())
     }

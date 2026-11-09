@@ -4,8 +4,8 @@
 use super::table::{
     DARK_CEILING, ENTER, GRANULARITY_MAX, GRANULARITY_MIN, GRANULARITY_PERCENT, GRANULARITY_STEP,
     HOLD_US, IO_FLOOR, IO_HEAVY, LATENCY, LATENCY_MIN, LATENCY_SPAN, LEAVE, MIGRATION,
-    MIGRATION_FLOOR, PACE_CEILING, PACE_MS, PACE_PATIENCE, PACES, RUNGS, VOLATILE_SLOPE, WAKEUP,
-    WALT,
+    MIGRATION_FLOOR, PACE_CEILING, PACE_MS, PACE_PATIENCE, PACES, RUNGS, TOUCH_FLOOR,
+    VOLATILE_SLOPE, WAKEUP, WALT,
 };
 use crate::automata::cadence::Cadence;
 use crate::automata::fixed::{at, floor_to, ratio, scaled};
@@ -20,6 +20,7 @@ pub struct Input {
     pub slope: i32,
     pub io: u32,
     pub screen: Screen,
+    pub engaged: bool,
     pub verdict: Verdict,
 }
 
@@ -84,14 +85,15 @@ impl Policy {
             rung
         };
 
-        let eager = ahead.min(ceiling);
+        let floor = if input.engaged { TOUCH_FLOOR } else { 0 };
+        let eager = ahead.max(floor).min(ceiling);
         if urgent {
             self.cadence.boost();
         }
 
         let next_us = self.cadence.next_us(at(&PACE_CEILING, eager));
         Decision {
-            plan: plan(rung.min(ceiling), eager, input),
+            plan: plan(rung.max(floor).min(ceiling), eager, input),
             next_us,
         }
     }
@@ -150,6 +152,7 @@ mod tests {
             slope,
             io,
             screen: Screen::On,
+            engaged: false,
             verdict,
         }
     }
@@ -347,5 +350,52 @@ mod tests {
         };
         assert_eq!(lit.step(busy, 0, false).next_us, 100_000, "lit and busy");
         assert_eq!(dark.step(off, 0, false).next_us, 2_500_000, "dark and busy");
+    }
+
+    #[test]
+    fn touch_lifts_an_idle_system_to_the_floor() {
+        let mut idle = Policy::new();
+        let mut touched = Policy::new();
+        let calm = input(0, 0, 0, FULL);
+        let engaged = Input {
+            engaged: true,
+            ..calm
+        };
+        assert_eq!(
+            idle.step(calm, 0, false).plan.latency,
+            at(&LATENCY, 0),
+            "idle without touch"
+        );
+        assert_eq!(
+            touched.step(engaged, 0, false).plan.latency,
+            at(&LATENCY, TOUCH_FLOOR),
+            "idle with touch"
+        );
+    }
+
+    #[test]
+    fn touch_never_lowers_a_busy_regime() {
+        let mut policy = Policy::new();
+        let busy = Input {
+            engaged: true,
+            ..input(400, 0, 0, FULL)
+        };
+        let plan = policy.step(busy, 0, false).plan;
+        assert_eq!(plan.latency, at(&LATENCY, 4), "load still sets the regime");
+    }
+
+    #[test]
+    fn touch_cannot_lift_a_lower_ceiling() {
+        let mut policy = Policy::new();
+        let low = Verdict {
+            scale: 1000,
+            ceiling: 0,
+        };
+        let engaged = Input {
+            engaged: true,
+            ..input(0, 0, 0, low)
+        };
+        let plan = policy.step(engaged, 0, false).plan;
+        assert_eq!(plan.latency, at(&LATENCY, 0), "budget ceiling still wins");
     }
 }

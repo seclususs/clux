@@ -198,6 +198,7 @@ impl Unit for Governor {
             slope: sample.slope,
             io: bus.io,
             screen: bus.screen,
+            engaged: bus.touch_until > now_us,
             verdict: self.budget.verdict(),
         };
 

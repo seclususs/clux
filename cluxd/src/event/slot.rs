@@ -13,13 +13,13 @@ const STABLE_US: u64 = 60_000_000;
 const BACKOFF_STEPS: u32 = 6;
 
 pub trait Watch {
-    fn attach(&self, fd: &Fd, token: u64) -> Outcome<()>;
+    fn attach(&self, fd: &Fd, token: u64, flags: u32) -> Outcome<()>;
     fn detach(&self, fd: &Fd);
 }
 
 impl Watch for Epoll {
-    fn attach(&self, fd: &Fd, token: u64) -> Outcome<()> {
-        self.add(fd, token, PRIORITY)
+    fn attach(&self, fd: &Fd, token: u64, flags: u32) -> Outcome<()> {
+        self.add(fd, token, flags)
     }
 
     fn detach(&self, fd: &Fd) {
@@ -36,6 +36,7 @@ pub enum Cause {
 pub trait Unit: Sized {
     const STARTED: &'static CStr;
     const FAILED: &'static CStr;
+    const WATCH: u32 = PRIORITY;
 
     fn spawn(now_us: u64) -> Outcome<Self>;
     fn watch(&self) -> Option<&Fd>;
@@ -124,7 +125,7 @@ impl<U: Unit> Slot<U> {
         match U::spawn(now_us) {
             Ok(unit) => {
                 if let Some(fd) = unit.watch()
-                    && watch.attach(fd, self.token).is_err()
+                    && watch.attach(fd, self.token, U::WATCH).is_err()
                 {
                     log::warn(c"event source rejected, falling back to timer");
                 }
@@ -217,7 +218,7 @@ mod tests {
     struct Null;
 
     impl Watch for Null {
-        fn attach(&self, _fd: &Fd, _token: u64) -> Outcome<()> {
+        fn attach(&self, _fd: &Fd, _token: u64, _flags: u32) -> Outcome<()> {
             Ok(())
         }
 

@@ -11,6 +11,7 @@ add_library(
   clux STATIC
   src/base.cpp
   src/event.cpp
+  src/input.cpp
   src/log.cpp
   src/node.cpp
   src/proc.cpp

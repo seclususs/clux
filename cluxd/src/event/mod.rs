@@ -12,6 +12,7 @@ pub const QUIET: u64 = 3;
 pub const VM: u64 = 4;
 pub const MEM: u64 = 5;
 pub const DISPLAY: u64 = 6;
+pub const TOUCH: u64 = 7;
 
 const BATCH: usize = 8;
 

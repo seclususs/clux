@@ -12,6 +12,7 @@ use crate::mem;
 use crate::psi::Bus;
 use crate::quiet;
 use crate::sched;
+use crate::touch;
 use crate::vm;
 
 const MAX_WAIT_MS: i32 = 60_000;
@@ -20,6 +21,7 @@ const MAX_WAIT_MS: i32 = 60_000;
 struct Governors {
     mem: Slot<mem::Governor>,
     display: Slot<display::Governor>,
+    touch: Slot<touch::Governor>,
     block: Slot<block::Governor>,
     sched: Slot<sched::Governor>,
     quiet: Slot<quiet::Governor>,
@@ -31,6 +33,7 @@ impl Governors {
         Self {
             mem: Slot::new(event::MEM),
             display: Slot::new(event::DISPLAY),
+            touch: Slot::new(event::TOUCH),
             block: Slot::new(event::BLOCK),
             sched: Slot::new(event::SCHED),
             quiet: Slot::new(event::QUIET),
@@ -38,10 +41,11 @@ impl Governors {
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 6] {
+    const fn deadlines(&self) -> [Option<u64>; 7] {
         [
             self.mem.deadline(),
             self.display.deadline(),
+            self.touch.deadline(),
             self.block.deadline(),
             self.sched.deadline(),
             self.quiet.deadline(),
@@ -54,14 +58,20 @@ impl Governors {
     }
 
     fn dispatch(&mut self, wake: Wake, epoll: &Epoll, now_us: u64, bus: &mut Bus) {
+        let held = bus.touch_until;
+
         route(&mut self.mem, wake, epoll, now_us, bus);
+        route(&mut self.touch, wake, epoll, now_us, bus);
         route(&mut self.block, wake, epoll, now_us, bus);
         route(&mut self.sched, wake, epoll, now_us, bus);
 
+        let nudge = interaction(held, bus.touch_until, now_us);
+
         self.mem.pump(epoll, now_us, bus, Cause::Timer);
         self.display.pump(epoll, now_us, bus, Cause::Timer);
+        self.touch.pump(epoll, now_us, bus, Cause::Timer);
         self.block.pump(epoll, now_us, bus, Cause::Timer);
-        self.sched.pump(epoll, now_us, bus, Cause::Timer);
+        self.sched.pump(epoll, now_us, bus, nudge);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
         self.vm.pump(epoll, now_us, bus, Cause::Timer);
     }
@@ -69,10 +79,19 @@ impl Governors {
     fn retire(&mut self) {
         self.mem.retire();
         self.display.retire();
+        self.touch.retire();
         self.block.retire();
         self.sched.retire();
         self.quiet.retire();
         self.vm.retire();
+    }
+}
+
+const fn interaction(before_us: u64, after_us: u64, now_us: u64) -> Cause {
+    if after_us > now_us && before_us <= now_us {
+        Cause::Trigger
+    } else {
+        Cause::Timer
     }
 }
 
@@ -124,6 +143,39 @@ mod tests {
 
     fn after(us: u64) -> u64 {
         NOW_US.saturating_add(us)
+    }
+
+    #[test]
+    fn a_first_touch_after_idle_nudges_the_governors() {
+        assert_eq!(
+            interaction(0, after(2_000_000), NOW_US),
+            Cause::Trigger,
+            "interaction began"
+        );
+        assert_eq!(
+            interaction(NOW_US.saturating_sub(1), after(2_000_000), NOW_US),
+            Cause::Trigger,
+            "previous hold already over"
+        );
+    }
+
+    #[test]
+    fn a_continuing_touch_does_not_nudge_again() {
+        assert_eq!(
+            interaction(after(1_000_000), after(2_000_000), NOW_US),
+            Cause::Timer,
+            "hold renewed while still held"
+        );
+    }
+
+    #[test]
+    fn no_touch_means_no_nudge() {
+        assert_eq!(interaction(0, 0, NOW_US), Cause::Timer, "never touched");
+        assert_eq!(
+            interaction(NOW_US.saturating_sub(5), NOW_US.saturating_sub(5), NOW_US),
+            Cause::Timer,
+            "hold expired without a new event"
+        );
     }
 
     #[test]

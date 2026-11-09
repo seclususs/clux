@@ -19,6 +19,7 @@ mod psi;
 mod quiet;
 mod sched;
 mod sysfs;
+mod touch;
 mod vm;
 
 #[cfg(not(test))]

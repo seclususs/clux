@@ -16,6 +16,7 @@ pub struct Bus {
     pub io: u32,
     pub mem: u32,
     pub screen: Screen,
+    pub touch_until: u64,
 }
 
 pub const MEM_TIGHT: u32 = 2;
