@@ -12,6 +12,7 @@ mod block;
 mod boot;
 mod event;
 mod log;
+mod mem;
 mod power;
 mod psi;
 mod quiet;

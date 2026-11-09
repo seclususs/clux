@@ -7,6 +7,7 @@ use crate::block;
 use crate::event::slot::{Cause, Slot, Unit};
 use crate::event::{self, Reactor, Wake};
 use crate::log;
+use crate::mem;
 use crate::psi::Bus;
 use crate::quiet;
 use crate::sched;
@@ -16,6 +17,7 @@ const MAX_WAIT_MS: i32 = 60_000;
 
 #[derive(Debug)]
 struct Governors {
+    mem: Slot<mem::Governor>,
     block: Slot<block::Governor>,
     sched: Slot<sched::Governor>,
     quiet: Slot<quiet::Governor>,
@@ -25,6 +27,7 @@ struct Governors {
 impl Governors {
     const fn new() -> Self {
         Self {
+            mem: Slot::new(event::MEM),
             block: Slot::new(event::BLOCK),
             sched: Slot::new(event::SCHED),
             quiet: Slot::new(event::QUIET),
@@ -32,8 +35,9 @@ impl Governors {
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 4] {
+    const fn deadlines(&self) -> [Option<u64>; 5] {
         [
+            self.mem.deadline(),
             self.block.deadline(),
             self.sched.deadline(),
             self.quiet.deadline(),
@@ -46,9 +50,11 @@ impl Governors {
     }
 
     fn dispatch(&mut self, wake: Wake, epoll: &Epoll, now_us: u64, bus: &mut Bus) {
+        route(&mut self.mem, wake, epoll, now_us, bus);
         route(&mut self.block, wake, epoll, now_us, bus);
         route(&mut self.sched, wake, epoll, now_us, bus);
 
+        self.mem.pump(epoll, now_us, bus, Cause::Timer);
         self.block.pump(epoll, now_us, bus, Cause::Timer);
         self.sched.pump(epoll, now_us, bus, Cause::Timer);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
@@ -56,6 +62,7 @@ impl Governors {
     }
 
     fn retire(&mut self) {
+        self.mem.retire();
         self.block.retire();
         self.sched.retire();
         self.quiet.retire();

@@ -115,6 +115,7 @@ impl Unit for Governor {
         let decision = self.policy.step(
             Input {
                 io: sample.level,
+                mem: bus.mem,
                 metrics,
             },
             now_us,

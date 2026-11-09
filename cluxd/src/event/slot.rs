@@ -317,7 +317,11 @@ mod tests {
 
     #[test]
     fn a_failing_unit_releases_what_it_published_on_the_bus() {
-        let mut bus = Bus { cpu: 700, io: 400 };
+        let mut bus = Bus {
+            cpu: 700,
+            io: 400,
+            ..Bus::default()
+        };
         let mut slot = Slot::<Probe<0>>::new(1);
         slot.pump(&Null, 0, &mut bus, Cause::Timer);
         bus.io = 400;

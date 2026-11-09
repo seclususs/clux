@@ -7,4 +7,7 @@ pub mod gauge;
 pub struct Bus {
     pub cpu: u32,
     pub io: u32,
+    pub mem: u32,
 }
+
+pub const MEM_TIGHT: u32 = 2;

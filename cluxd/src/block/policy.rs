@@ -5,6 +5,7 @@ use crate::automata::cadence::Cadence;
 use crate::automata::envelope::Envelope;
 use crate::automata::fixed::at;
 use crate::automata::ladder::Ladder;
+use crate::psi::MEM_TIGHT;
 
 use super::stat::Metrics;
 
@@ -29,6 +30,7 @@ const STALLED_FLOOR: u32 = 220;
 #[derive(Clone, Copy, Debug)]
 pub struct Input {
     pub io: u32,
+    pub mem: u32,
     pub metrics: Metrics,
 }
 
@@ -80,15 +82,17 @@ impl Policy {
         }
 
         let rung = self.pressure.rung();
+        let pattern = self.pattern.rung();
+        let ahead = if input.mem >= MEM_TIGHT { 0 } else { pattern };
 
         Decision {
             plan: Plan {
-                read_ahead: at(&READ_AHEAD, self.pattern.rung()),
+                read_ahead: at(&READ_AHEAD, ahead),
                 share: at(&SHARE, rung),
             },
             next_us: self
                 .cadence
-                .next_us(at(&PACE_CEILING, rung).min(at(&PATTERN_CEILING, self.pattern.rung()))),
+                .next_us(at(&PACE_CEILING, rung).min(at(&PATTERN_CEILING, pattern))),
         }
     }
 }
@@ -123,6 +127,7 @@ mod tests {
             .step(
                 Input {
                     io: 0,
+                    mem: 0,
                     metrics: metrics(0, 0),
                 },
                 0,
@@ -145,6 +150,7 @@ mod tests {
             .step(
                 Input {
                     io: 300,
+                    mem: 0,
                     metrics: metrics(0, 0),
                 },
                 0,
@@ -161,6 +167,7 @@ mod tests {
             .step(
                 Input {
                     io: 0,
+                    mem: 0,
                     metrics: metrics(0, 45),
                 },
                 0,
@@ -173,6 +180,7 @@ mod tests {
             .step(
                 Input {
                     io: 0,
+                    mem: 0,
                     metrics: metrics(0, 150),
                 },
                 0,
@@ -194,6 +202,7 @@ mod tests {
                 .step(
                     Input {
                         io: 60,
+                        mem: 0,
                         metrics: metrics(900, 5),
                     },
                     tick * S,
@@ -207,6 +216,7 @@ mod tests {
                 .step(
                     Input {
                         io: 0,
+                        mem: 0,
                         metrics: metrics(0, 0),
                     },
                     tick * S,
@@ -225,6 +235,7 @@ mod tests {
             .step(
                 Input {
                     io: 0,
+                    mem: 0,
                     metrics: metrics(0, 0),
                 },
                 0,
@@ -237,6 +248,7 @@ mod tests {
                 .step(
                     Input {
                         io: 0,
+                        mem: 0,
                         metrics: metrics(900, 5),
                     },
                     tick * S,
@@ -255,6 +267,7 @@ mod tests {
             .step(
                 Input {
                     io: 0,
+                    mem: 0,
                     metrics: metrics(0, 0),
                 },
                 0,
@@ -265,6 +278,7 @@ mod tests {
             .step(
                 Input {
                     io: 300,
+                    mem: 0,
                     metrics: metrics(0, 0),
                 },
                 S,
@@ -273,5 +287,51 @@ mod tests {
             .next_us;
         assert_eq!(idle, 5_000_000);
         assert_eq!(busy, 100_000);
+    }
+
+    #[test]
+    fn tight_memory_caps_the_readahead() {
+        let mut policy = Policy::new();
+        let mut plan = Plan {
+            read_ahead: 0,
+            share: 0,
+        };
+        for tick in 0..8 {
+            plan = policy
+                .step(
+                    Input {
+                        io: 60,
+                        mem: MEM_TIGHT,
+                        metrics: metrics(900, 5),
+                    },
+                    tick * S,
+                    false,
+                )
+                .plan;
+        }
+        assert_eq!(plan.read_ahead, 128);
+    }
+
+    #[test]
+    fn light_memory_strain_leaves_the_readahead_alone() {
+        let mut policy = Policy::new();
+        let mut plan = Plan {
+            read_ahead: 0,
+            share: 0,
+        };
+        for tick in 0..8 {
+            plan = policy
+                .step(
+                    Input {
+                        io: 60,
+                        mem: MEM_TIGHT.saturating_sub(1),
+                        metrics: metrics(900, 5),
+                    },
+                    tick * S,
+                    false,
+                )
+                .plan;
+        }
+        assert_eq!(plan.read_ahead, 1024);
     }
 }
