@@ -17,6 +17,7 @@ use crate::sched;
 use crate::touch;
 use crate::vm;
 use crate::writeback;
+use crate::zram;
 
 const MAX_WAIT_MS: i32 = 60_000;
 
@@ -32,6 +33,7 @@ struct Governors {
     vm: Slot<vm::Governor>,
     writeback: Slot<writeback::Governor>,
     reclaim: Slot<reclaim::Governor>,
+    zram: Slot<zram::Governor>,
 }
 
 impl Governors {
@@ -47,10 +49,11 @@ impl Governors {
             vm: Slot::new(event::VM),
             writeback: Slot::new(event::WRITEBACK),
             reclaim: Slot::new(event::RECLAIM),
+            zram: Slot::new(event::ZRAM),
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 10] {
+    const fn deadlines(&self) -> [Option<u64>; 11] {
         [
             self.mem.deadline(),
             self.display.deadline(),
@@ -62,6 +65,7 @@ impl Governors {
             self.vm.deadline(),
             self.writeback.deadline(),
             self.reclaim.deadline(),
+            self.zram.deadline(),
         ]
     }
 
@@ -72,6 +76,7 @@ impl Governors {
             && self.vm.dead()
             && self.writeback.dead()
             && self.reclaim.dead()
+            && self.zram.dead()
     }
 
     fn dispatch(&mut self, wake: Wake, epoll: &Epoll, now_us: u64, bus: &mut Bus) {
@@ -94,6 +99,7 @@ impl Governors {
         self.vm.pump(epoll, now_us, bus, Cause::Timer);
         self.writeback.pump(epoll, now_us, bus, Cause::Timer);
         self.reclaim.pump(epoll, now_us, bus, Cause::Timer);
+        self.zram.pump(epoll, now_us, bus, Cause::Timer);
     }
 
     fn retire(&mut self) {
@@ -107,6 +113,7 @@ impl Governors {
         self.vm.retire();
         self.writeback.retire();
         self.reclaim.retire();
+        self.zram.retire();
     }
 }
 

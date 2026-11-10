@@ -24,6 +24,7 @@ mod sysfs;
 mod touch;
 mod vm;
 mod writeback;
+mod zram;
 
 #[cfg(not(test))]
 #[panic_handler]
