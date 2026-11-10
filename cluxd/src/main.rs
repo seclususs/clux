@@ -22,6 +22,7 @@ mod sched;
 mod sysfs;
 mod touch;
 mod vm;
+mod writeback;
 
 #[cfg(not(test))]
 #[panic_handler]

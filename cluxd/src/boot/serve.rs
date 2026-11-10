@@ -15,6 +15,7 @@ use crate::quiet;
 use crate::sched;
 use crate::touch;
 use crate::vm;
+use crate::writeback;
 
 const MAX_WAIT_MS: i32 = 60_000;
 
@@ -28,6 +29,7 @@ struct Governors {
     sched: Slot<sched::Governor>,
     quiet: Slot<quiet::Governor>,
     vm: Slot<vm::Governor>,
+    writeback: Slot<writeback::Governor>,
 }
 
 impl Governors {
@@ -41,10 +43,11 @@ impl Governors {
             sched: Slot::new(event::SCHED),
             quiet: Slot::new(event::QUIET),
             vm: Slot::new(event::VM),
+            writeback: Slot::new(event::WRITEBACK),
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 8] {
+    const fn deadlines(&self) -> [Option<u64>; 9] {
         [
             self.mem.deadline(),
             self.display.deadline(),
@@ -54,11 +57,16 @@ impl Governors {
             self.sched.deadline(),
             self.quiet.deadline(),
             self.vm.deadline(),
+            self.writeback.deadline(),
         ]
     }
 
     const fn dead(&self) -> bool {
-        self.block.dead() && self.sched.dead() && self.quiet.dead() && self.vm.dead()
+        self.block.dead()
+            && self.sched.dead()
+            && self.quiet.dead()
+            && self.vm.dead()
+            && self.writeback.dead()
     }
 
     fn dispatch(&mut self, wake: Wake, epoll: &Epoll, now_us: u64, bus: &mut Bus) {
@@ -79,6 +87,7 @@ impl Governors {
         self.sched.pump(epoll, now_us, bus, nudge);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
         self.vm.pump(epoll, now_us, bus, Cause::Timer);
+        self.writeback.pump(epoll, now_us, bus, Cause::Timer);
     }
 
     fn retire(&mut self) {
@@ -90,6 +99,7 @@ impl Governors {
         self.sched.retire();
         self.quiet.retire();
         self.vm.retire();
+        self.writeback.retire();
     }
 }
 
