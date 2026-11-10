@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use crate::automata::dwell::Dwell;
-use crate::automata::fixed::{at, scaled};
+use crate::automata::fixed::{at, stretch};
 use crate::psi::{MEM_TIGHT, Screen};
 
 const NORMAL: u32 = 0;
@@ -76,14 +76,6 @@ const fn want(input: Input) -> u32 {
     } else {
         NORMAL
     }
-}
-
-fn stretch(origin: u32, share: u32, floor: u32, cap: u32) -> u32 {
-    if origin == 0 {
-        return 0;
-    }
-
-    scaled(origin, share).clamp(floor.min(origin), cap.max(origin))
 }
 
 pub fn plan(origin: Origin, regime: u32) -> Plan {

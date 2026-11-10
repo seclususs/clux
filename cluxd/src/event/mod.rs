@@ -15,6 +15,7 @@ pub const DISPLAY: u64 = 6;
 pub const TOUCH: u64 = 7;
 pub const CHARGER: u64 = 8;
 pub const WRITEBACK: u64 = 9;
+pub const RECLAIM: u64 = 10;
 
 const BATCH: usize = 8;
 

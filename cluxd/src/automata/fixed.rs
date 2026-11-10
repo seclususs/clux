@@ -25,6 +25,14 @@ pub fn scaled(value: u32, per_mille: u32) -> u32 {
     ratio(u64::from(value), 1000, u64::from(per_mille))
 }
 
+pub fn stretch(origin: u32, share: u32, floor: u32, cap: u32) -> u32 {
+    if origin == 0 {
+        return 0;
+    }
+
+    scaled(origin, share).clamp(floor.min(origin), cap.max(origin))
+}
+
 pub fn floor_to(value: u32, step: u32) -> u32 {
     value
         .checked_div(step)
@@ -53,6 +61,21 @@ mod tests {
         assert_eq!(ratio(5, 0, 1000), 0);
         assert_eq!(ratio(1, 4, 1000), 250);
         assert_eq!(ratio(u64::MAX, 1, 1000), u32::MAX);
+    }
+
+    #[test]
+    fn stretch_follows_the_share_inside_the_bounds() {
+        assert_eq!(stretch(100, 700, 10, 400), 70);
+        assert_eq!(stretch(100, 1500, 10, 400), 150);
+        assert_eq!(stretch(100, 5000, 10, 400), 400);
+        assert_eq!(stretch(100, 50, 10, 400), 10);
+    }
+
+    #[test]
+    fn stretch_never_leaves_the_device_default_for_the_worse() {
+        assert_eq!(stretch(5, 500, 10, 400), 5, "floor above the default");
+        assert_eq!(stretch(900, 2000, 10, 400), 900, "cap below the default");
+        assert_eq!(stretch(0, 2000, 10, 400), 0, "disabled stays disabled");
     }
 
     #[test]

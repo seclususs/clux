@@ -18,6 +18,7 @@ mod mem;
 mod power;
 mod psi;
 mod quiet;
+mod reclaim;
 mod sched;
 mod sysfs;
 mod touch;
