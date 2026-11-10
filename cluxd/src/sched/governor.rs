@@ -89,7 +89,7 @@ fn mount_debugfs() -> bool {
 }
 
 impl Governor {
-    fn refresh(&mut self, now_us: u64) {
+    fn refresh(&mut self, now_us: u64, plugged: bool) {
         let cpu = self.zone.read().map(sensor::from_milli);
 
         let due = self
@@ -113,6 +113,7 @@ impl Governor {
                 cpu,
                 battery,
                 level,
+                plugged,
             },
             now_us,
         );
@@ -187,7 +188,7 @@ impl Unit for Governor {
 
         let sample = self.gauge.sample(now_us, stale)?;
         bus.cpu = sample.level;
-        self.refresh(now_us);
+        self.refresh(now_us, bus.plugged);
 
         if self.budget.lost(now_us) {
             return Err(Fault::Errno(5));

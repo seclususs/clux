@@ -45,6 +45,7 @@ pub struct Reading {
     pub cpu: Option<i32>,
     pub battery: Option<i32>,
     pub level: Option<u32>,
+    pub plugged: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -99,8 +100,12 @@ impl Budget {
 
         let _ = self.thermal.step(input, now_us);
 
-        let used = fresh(self.level, now_us, LEVEL_TTL_US)
-            .map_or(0, |level| 100_u32.saturating_sub(level.min(100)));
+        let used = if reading.plugged {
+            0
+        } else {
+            fresh(self.level, now_us, LEVEL_TTL_US)
+                .map_or(0, |level| 100_u32.saturating_sub(level.min(100)))
+        };
 
         let _ = self.battery.step(used, now_us);
     }
@@ -130,6 +135,8 @@ mod tests {
             cpu: Some(cpu),
             battery: Some(battery),
             level: Some(level),
+
+            ..Reading::default()
         }
     }
 
@@ -181,6 +188,8 @@ mod tests {
                 cpu: None,
                 battery: Some(410),
                 level: Some(90),
+
+                ..Reading::default()
             },
             0,
         );
@@ -195,6 +204,8 @@ mod tests {
                 cpu: None,
                 battery: Some(404),
                 level: Some(90),
+
+                ..Reading::default()
             },
             0,
         );
@@ -211,6 +222,8 @@ mod tests {
                 cpu: None,
                 battery: Some(410),
                 level: Some(90),
+
+                ..Reading::default()
             },
             100 * S,
         );
@@ -280,6 +293,8 @@ mod tests {
                     cpu: Some(300),
                     battery: None,
                     level: Some(90),
+
+                    ..Reading::default()
                 },
                 tick * 60 * S,
             );
@@ -295,5 +310,44 @@ mod tests {
         budget.feed(Reading::default(), 700 * S);
         budget.feed(Reading::default(), 740 * S);
         assert_eq!(budget.verdict().ceiling, 4);
+    }
+
+    #[test]
+    fn external_power_lifts_the_battery_ceiling() {
+        let mut budget = Budget::new();
+        let drained = reading(300, 300, 10);
+        let supplied = Reading {
+            plugged: true,
+            ..drained
+        };
+        budget.feed(drained, 0);
+        assert_eq!(
+            budget.verdict().ceiling,
+            1,
+            "drained battery limits the cpu"
+        );
+        budget.feed(supplied, S);
+        assert_eq!(budget.verdict().ceiling, 1, "still held after plugging in");
+        budget.feed(supplied, 40 * S);
+        assert_eq!(budget.verdict().ceiling, 4, "external power frees the cpu");
+        budget.feed(drained, 41 * S);
+        assert_eq!(budget.verdict().ceiling, 1, "unplugging limits it at once");
+    }
+
+    #[test]
+    fn external_power_does_not_relax_the_thermal_scale() {
+        let mut budget = Budget::new();
+        budget.feed(
+            Reading {
+                plugged: true,
+                ..reading(540, 300, 90)
+            },
+            0,
+        );
+        assert_eq!(
+            budget.verdict().scale,
+            400,
+            "heat still scales the cpu down"
+        );
     }
 }

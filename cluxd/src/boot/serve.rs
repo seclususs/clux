@@ -4,6 +4,7 @@
 use super::gate::millis;
 use crate::abi::{self, Epoll, Outcome};
 use crate::block;
+use crate::charger;
 use crate::display;
 use crate::event::slot::{Cause, Slot, Unit};
 use crate::event::{self, Reactor, Wake};
@@ -22,6 +23,7 @@ struct Governors {
     mem: Slot<mem::Governor>,
     display: Slot<display::Governor>,
     touch: Slot<touch::Governor>,
+    charger: Slot<charger::Governor>,
     block: Slot<block::Governor>,
     sched: Slot<sched::Governor>,
     quiet: Slot<quiet::Governor>,
@@ -34,6 +36,7 @@ impl Governors {
             mem: Slot::new(event::MEM),
             display: Slot::new(event::DISPLAY),
             touch: Slot::new(event::TOUCH),
+            charger: Slot::new(event::CHARGER),
             block: Slot::new(event::BLOCK),
             sched: Slot::new(event::SCHED),
             quiet: Slot::new(event::QUIET),
@@ -41,11 +44,12 @@ impl Governors {
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 7] {
+    const fn deadlines(&self) -> [Option<u64>; 8] {
         [
             self.mem.deadline(),
             self.display.deadline(),
             self.touch.deadline(),
+            self.charger.deadline(),
             self.block.deadline(),
             self.sched.deadline(),
             self.quiet.deadline(),
@@ -70,6 +74,7 @@ impl Governors {
         self.mem.pump(epoll, now_us, bus, Cause::Timer);
         self.display.pump(epoll, now_us, bus, Cause::Timer);
         self.touch.pump(epoll, now_us, bus, Cause::Timer);
+        self.charger.pump(epoll, now_us, bus, Cause::Timer);
         self.block.pump(epoll, now_us, bus, Cause::Timer);
         self.sched.pump(epoll, now_us, bus, nudge);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
@@ -80,6 +85,7 @@ impl Governors {
         self.mem.retire();
         self.display.retire();
         self.touch.retire();
+        self.charger.retire();
         self.block.retire();
         self.sched.retire();
         self.quiet.retire();

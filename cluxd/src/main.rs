@@ -10,6 +10,7 @@ mod abi;
 mod automata;
 mod block;
 mod boot;
+mod charger;
 mod display;
 mod event;
 mod log;
