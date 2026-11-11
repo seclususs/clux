@@ -11,6 +11,7 @@ mod automata;
 mod block;
 mod boot;
 mod charger;
+mod cpufreq;
 mod display;
 mod event;
 mod log;

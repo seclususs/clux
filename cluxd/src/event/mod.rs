@@ -17,6 +17,7 @@ pub const CHARGER: u64 = 8;
 pub const WRITEBACK: u64 = 9;
 pub const RECLAIM: u64 = 10;
 pub const ZRAM: u64 = 11;
+pub const CPUFREQ: u64 = 12;
 
 const BATCH: usize = 8;
 

@@ -5,6 +5,7 @@ use super::gate::millis;
 use crate::abi::{self, Epoll, Outcome};
 use crate::block;
 use crate::charger;
+use crate::cpufreq;
 use crate::display;
 use crate::event::slot::{Cause, Slot, Unit};
 use crate::event::{self, Reactor, Wake};
@@ -29,6 +30,7 @@ struct Governors {
     charger: Slot<charger::Governor>,
     block: Slot<block::Governor>,
     sched: Slot<sched::Governor>,
+    cpufreq: Slot<cpufreq::Governor>,
     quiet: Slot<quiet::Governor>,
     vm: Slot<vm::Governor>,
     writeback: Slot<writeback::Governor>,
@@ -45,6 +47,7 @@ impl Governors {
             charger: Slot::new(event::CHARGER),
             block: Slot::new(event::BLOCK),
             sched: Slot::new(event::SCHED),
+            cpufreq: Slot::new(event::CPUFREQ),
             quiet: Slot::new(event::QUIET),
             vm: Slot::new(event::VM),
             writeback: Slot::new(event::WRITEBACK),
@@ -53,7 +56,7 @@ impl Governors {
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 11] {
+    const fn deadlines(&self) -> [Option<u64>; 12] {
         [
             self.mem.deadline(),
             self.display.deadline(),
@@ -61,6 +64,7 @@ impl Governors {
             self.charger.deadline(),
             self.block.deadline(),
             self.sched.deadline(),
+            self.cpufreq.deadline(),
             self.quiet.deadline(),
             self.vm.deadline(),
             self.writeback.deadline(),
@@ -72,6 +76,7 @@ impl Governors {
     const fn dead(&self) -> bool {
         self.block.dead()
             && self.sched.dead()
+            && self.cpufreq.dead()
             && self.quiet.dead()
             && self.vm.dead()
             && self.writeback.dead()
@@ -95,6 +100,7 @@ impl Governors {
         self.charger.pump(epoll, now_us, bus, Cause::Timer);
         self.block.pump(epoll, now_us, bus, Cause::Timer);
         self.sched.pump(epoll, now_us, bus, nudge);
+        self.cpufreq.pump(epoll, now_us, bus, nudge);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
         self.vm.pump(epoll, now_us, bus, Cause::Timer);
         self.writeback.pump(epoll, now_us, bus, Cause::Timer);
@@ -109,6 +115,7 @@ impl Governors {
         self.charger.retire();
         self.block.retire();
         self.sched.retire();
+        self.cpufreq.retire();
         self.quiet.retire();
         self.vm.retire();
         self.writeback.retire();
