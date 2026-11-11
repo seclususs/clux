@@ -19,6 +19,7 @@ mod mem;
 mod power;
 mod psi;
 mod quiet;
+mod rcu;
 mod reclaim;
 mod sched;
 mod sysfs;

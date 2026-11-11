@@ -13,6 +13,7 @@ use crate::log;
 use crate::mem;
 use crate::psi::Bus;
 use crate::quiet;
+use crate::rcu;
 use crate::reclaim;
 use crate::sched;
 use crate::touch;
@@ -31,6 +32,7 @@ struct Governors {
     block: Slot<block::Governor>,
     sched: Slot<sched::Governor>,
     cpufreq: Slot<cpufreq::Governor>,
+    rcu: Slot<rcu::Governor>,
     quiet: Slot<quiet::Governor>,
     vm: Slot<vm::Governor>,
     writeback: Slot<writeback::Governor>,
@@ -48,6 +50,7 @@ impl Governors {
             block: Slot::new(event::BLOCK),
             sched: Slot::new(event::SCHED),
             cpufreq: Slot::new(event::CPUFREQ),
+            rcu: Slot::new(event::RCU),
             quiet: Slot::new(event::QUIET),
             vm: Slot::new(event::VM),
             writeback: Slot::new(event::WRITEBACK),
@@ -56,7 +59,7 @@ impl Governors {
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 12] {
+    const fn deadlines(&self) -> [Option<u64>; 13] {
         [
             self.mem.deadline(),
             self.display.deadline(),
@@ -65,6 +68,7 @@ impl Governors {
             self.block.deadline(),
             self.sched.deadline(),
             self.cpufreq.deadline(),
+            self.rcu.deadline(),
             self.quiet.deadline(),
             self.vm.deadline(),
             self.writeback.deadline(),
@@ -77,6 +81,7 @@ impl Governors {
         self.block.dead()
             && self.sched.dead()
             && self.cpufreq.dead()
+            && self.rcu.dead()
             && self.quiet.dead()
             && self.vm.dead()
             && self.writeback.dead()
@@ -101,6 +106,7 @@ impl Governors {
         self.block.pump(epoll, now_us, bus, Cause::Timer);
         self.sched.pump(epoll, now_us, bus, nudge);
         self.cpufreq.pump(epoll, now_us, bus, nudge);
+        self.rcu.pump(epoll, now_us, bus, nudge);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
         self.vm.pump(epoll, now_us, bus, Cause::Timer);
         self.writeback.pump(epoll, now_us, bus, Cause::Timer);
@@ -116,6 +122,7 @@ impl Governors {
         self.block.retire();
         self.sched.retire();
         self.cpufreq.retire();
+        self.rcu.retire();
         self.quiet.retire();
         self.vm.retire();
         self.writeback.retire();
