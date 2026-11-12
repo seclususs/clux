@@ -11,6 +11,7 @@ use crate::event::slot::{Cause, Slot, Unit};
 use crate::event::{self, Reactor, Wake};
 use crate::log;
 use crate::mem;
+use crate::net;
 use crate::psi::Bus;
 use crate::quiet;
 use crate::rcu;
@@ -33,6 +34,7 @@ struct Governors {
     sched: Slot<sched::Governor>,
     cpufreq: Slot<cpufreq::Governor>,
     rcu: Slot<rcu::Governor>,
+    net: Slot<net::Governor>,
     quiet: Slot<quiet::Governor>,
     vm: Slot<vm::Governor>,
     writeback: Slot<writeback::Governor>,
@@ -51,6 +53,7 @@ impl Governors {
             sched: Slot::new(event::SCHED),
             cpufreq: Slot::new(event::CPUFREQ),
             rcu: Slot::new(event::RCU),
+            net: Slot::new(event::NET),
             quiet: Slot::new(event::QUIET),
             vm: Slot::new(event::VM),
             writeback: Slot::new(event::WRITEBACK),
@@ -59,7 +62,7 @@ impl Governors {
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 13] {
+    const fn deadlines(&self) -> [Option<u64>; 14] {
         [
             self.mem.deadline(),
             self.display.deadline(),
@@ -69,6 +72,7 @@ impl Governors {
             self.sched.deadline(),
             self.cpufreq.deadline(),
             self.rcu.deadline(),
+            self.net.deadline(),
             self.quiet.deadline(),
             self.vm.deadline(),
             self.writeback.deadline(),
@@ -82,6 +86,7 @@ impl Governors {
             && self.sched.dead()
             && self.cpufreq.dead()
             && self.rcu.dead()
+            && self.net.dead()
             && self.quiet.dead()
             && self.vm.dead()
             && self.writeback.dead()
@@ -107,6 +112,7 @@ impl Governors {
         self.sched.pump(epoll, now_us, bus, nudge);
         self.cpufreq.pump(epoll, now_us, bus, nudge);
         self.rcu.pump(epoll, now_us, bus, nudge);
+        self.net.pump(epoll, now_us, bus, Cause::Timer);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
         self.vm.pump(epoll, now_us, bus, Cause::Timer);
         self.writeback.pump(epoll, now_us, bus, Cause::Timer);
@@ -123,6 +129,7 @@ impl Governors {
         self.sched.retire();
         self.cpufreq.retire();
         self.rcu.retire();
+        self.net.retire();
         self.quiet.retire();
         self.vm.retire();
         self.writeback.retire();

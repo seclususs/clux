@@ -6,3 +6,4 @@ pub mod knob;
 pub mod lexer;
 pub mod path;
 pub mod probe;
+pub mod text;

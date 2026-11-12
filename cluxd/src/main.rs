@@ -16,6 +16,7 @@ mod display;
 mod event;
 mod log;
 mod mem;
+mod net;
 mod power;
 mod psi;
 mod quiet;

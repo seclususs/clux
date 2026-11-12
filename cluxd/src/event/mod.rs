@@ -19,6 +19,7 @@ pub const RECLAIM: u64 = 10;
 pub const ZRAM: u64 = 11;
 pub const CPUFREQ: u64 = 12;
 pub const RCU: u64 = 13;
+pub const NET: u64 = 14;
 
 const BATCH: usize = 8;
 
