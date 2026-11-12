@@ -97,7 +97,8 @@ bool pseudo(int fd) noexcept
     const Magic type = info.f_type;
 
     return type == static_cast<Magic>(PROC_SUPER_MAGIC) ||
-           type == static_cast<Magic>(SYSFS_MAGIC) || type == static_cast<Magic>(DEBUGFS_MAGIC);
+           type == static_cast<Magic>(SYSFS_MAGIC) || type == static_cast<Magic>(DEBUGFS_MAGIC) ||
+           type == static_cast<Magic>(CGROUP_SUPER_MAGIC);
 }
 
 int32_t put(const char *path, const char *text) noexcept

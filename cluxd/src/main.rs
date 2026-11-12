@@ -10,6 +10,7 @@ mod abi;
 mod automata;
 mod block;
 mod boot;
+mod cgroup;
 mod charger;
 mod cpufreq;
 mod display;

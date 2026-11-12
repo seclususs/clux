@@ -58,6 +58,16 @@ pub fn pair(text: &[u8]) -> Option<(u32, u32)> {
     Some((major, minor))
 }
 
+pub fn percent(text: &[u8]) -> Option<u32> {
+    let text = text.trim_ascii();
+
+    if text == b"max" {
+        return Some(100);
+    }
+
+    centi(text).map(|hundredths| (hundredths / 100).min(100))
+}
+
 pub fn centi(text: &[u8]) -> Option<u32> {
     let mut state = Fixed::Start;
     let mut whole: u32 = 0;
@@ -187,5 +197,24 @@ mod tests {
         assert_eq!(pair(b"8:x"), None);
         assert_eq!(pair(b"8 : 3"), None);
         assert_eq!(pair(b"99999999999:1"), None);
+    }
+
+    #[test]
+    fn percent_reads_the_cgroup_clamp_format() {
+        assert_eq!(percent(b"0.00\n"), Some(0), "default minimum");
+        assert_eq!(percent(b"max\n"), Some(100), "default maximum");
+        assert_eq!(percent(b"37.50\n"), Some(37), "fraction is dropped");
+        assert_eq!(percent(b"100.00\n"), Some(100), "full capacity");
+        assert_eq!(percent(b"25\n"), Some(25), "plain percent");
+        assert_eq!(percent(b" 5 "), Some(5), "surrounding blanks");
+    }
+
+    #[test]
+    fn percent_is_bounded_and_strict() {
+        assert_eq!(percent(b"250.00\n"), Some(100), "never above full capacity");
+        assert_eq!(percent(b"maxx\n"), None, "not the keyword");
+        assert_eq!(percent(b"-5\n"), None, "no negative clamp");
+        assert_eq!(percent(b"\n"), None, "blank");
+        assert_eq!(percent(b""), None, "empty");
     }
 }

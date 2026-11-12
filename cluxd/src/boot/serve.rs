@@ -4,6 +4,7 @@
 use super::gate::millis;
 use crate::abi::{self, Epoll, Outcome};
 use crate::block;
+use crate::cgroup;
 use crate::charger;
 use crate::cpufreq;
 use crate::display;
@@ -35,6 +36,7 @@ struct Governors {
     cpufreq: Slot<cpufreq::Governor>,
     rcu: Slot<rcu::Governor>,
     net: Slot<net::Governor>,
+    cgroup: Slot<cgroup::Governor>,
     quiet: Slot<quiet::Governor>,
     vm: Slot<vm::Governor>,
     writeback: Slot<writeback::Governor>,
@@ -54,6 +56,7 @@ impl Governors {
             cpufreq: Slot::new(event::CPUFREQ),
             rcu: Slot::new(event::RCU),
             net: Slot::new(event::NET),
+            cgroup: Slot::new(event::CGROUP),
             quiet: Slot::new(event::QUIET),
             vm: Slot::new(event::VM),
             writeback: Slot::new(event::WRITEBACK),
@@ -62,7 +65,7 @@ impl Governors {
         }
     }
 
-    const fn deadlines(&self) -> [Option<u64>; 14] {
+    const fn deadlines(&self) -> [Option<u64>; 15] {
         [
             self.mem.deadline(),
             self.display.deadline(),
@@ -73,6 +76,7 @@ impl Governors {
             self.cpufreq.deadline(),
             self.rcu.deadline(),
             self.net.deadline(),
+            self.cgroup.deadline(),
             self.quiet.deadline(),
             self.vm.deadline(),
             self.writeback.deadline(),
@@ -87,6 +91,7 @@ impl Governors {
             && self.cpufreq.dead()
             && self.rcu.dead()
             && self.net.dead()
+            && self.cgroup.dead()
             && self.quiet.dead()
             && self.vm.dead()
             && self.writeback.dead()
@@ -113,6 +118,7 @@ impl Governors {
         self.cpufreq.pump(epoll, now_us, bus, nudge);
         self.rcu.pump(epoll, now_us, bus, nudge);
         self.net.pump(epoll, now_us, bus, Cause::Timer);
+        self.cgroup.pump(epoll, now_us, bus, nudge);
         self.quiet.pump(epoll, now_us, bus, Cause::Timer);
         self.vm.pump(epoll, now_us, bus, Cause::Timer);
         self.writeback.pump(epoll, now_us, bus, Cause::Timer);
@@ -130,6 +136,7 @@ impl Governors {
         self.cpufreq.retire();
         self.rcu.retire();
         self.net.retire();
+        self.cgroup.retire();
         self.quiet.retire();
         self.vm.retire();
         self.writeback.retire();

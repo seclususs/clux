@@ -29,6 +29,12 @@ impl Breaker {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Kind {
+    Count,
+    Percent,
+}
+
 #[derive(Debug)]
 pub struct Knob {
     node: Option<Fd>,
@@ -37,15 +43,24 @@ pub struct Knob {
     breaker: Breaker,
     muted: bool,
     tag: Path<TAG_CAP>,
+    kind: Kind,
 }
 
 impl Knob {
     pub fn open(path: &CStr) -> Self {
+        Self::attach(path, Kind::Count)
+    }
+
+    pub fn percent(path: &CStr) -> Self {
+        Self::attach(path, Kind::Percent)
+    }
+
+    fn attach(path: &CStr, kind: Kind) -> Self {
         let node = abi::open(path, Mode::ReadWrite)
             .or_else(|_| abi::open(path, Mode::Write))
             .ok();
 
-        let origin = node.as_ref().and_then(Self::probe);
+        let origin = node.as_ref().and_then(|fd| Self::probe(fd, kind));
         if let Some(value) = origin {
             let _ = abi::journal(path, value);
         }
@@ -57,6 +72,7 @@ impl Knob {
             breaker: Breaker::default(),
             muted: false,
             tag: Self::tag_of(path),
+            kind,
         }
     }
 
@@ -77,6 +93,7 @@ impl Knob {
             breaker: Breaker { strikes: 0 },
             muted: false,
             tag: Path::new(),
+            kind: Kind::Count,
         }
     }
 
@@ -89,7 +106,9 @@ impl Knob {
     }
 
     pub fn level(&self) -> Option<u32> {
-        self.node.as_ref().and_then(Self::probe)
+        self.node
+            .as_ref()
+            .and_then(|node| Self::probe(node, self.kind))
     }
 
     pub fn force(&mut self, value: u32) -> bool {
@@ -160,11 +179,15 @@ impl Knob {
         Path::new().push(name).unwrap_or_else(Path::new)
     }
 
-    fn probe(node: &Fd) -> Option<u32> {
+    fn probe(node: &Fd, kind: Kind) -> Option<u32> {
         let mut buf = [0_u8; READ_CAP];
         let got = node.read(&mut buf).ok()?;
-        let value = lexer::uint(buf.get(..got)?)?;
-        u32::try_from(value).ok()
+        let text = buf.get(..got)?;
+
+        match kind {
+            Kind::Count => u32::try_from(lexer::uint(text)?).ok(),
+            Kind::Percent => lexer::percent(text),
+        }
     }
 }
 

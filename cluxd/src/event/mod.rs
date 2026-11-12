@@ -20,6 +20,7 @@ pub const ZRAM: u64 = 11;
 pub const CPUFREQ: u64 = 12;
 pub const RCU: u64 = 13;
 pub const NET: u64 = 14;
+pub const CGROUP: u64 = 15;
 
 const BATCH: usize = 8;
 
